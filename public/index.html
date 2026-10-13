@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HaniaCart · מה יש בבית</title>
+<meta name="description" content="רשימת קניות משותפת לכל הבית, מלאי עם התראות תפוגה, סריקת חשבוניות, תכנון ארוחות ומעקב מחירים. בחינם, בלי הרשמה.">
+<meta name="theme-color" content="#1E7A52">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HaniaCart">
+<style>
+/* Layout: one phone column, five tabs at the thumb, list rows on hairlines; a status pill carries urgency. */
+:root{
+  --bg:#F1F6F2; --surface:#FFFFFF; --ink:#13261C; --muted:#5B6F63; --line:#D6E2D9;
+  --brand:#1E7A52; --on-brand:#FFFFFF; --brand-soft:#E2F1E8;
+  --bad:#B4362A; --warn:#93600B; --ok:#2B7A3E;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans Hebrew","Arial Hebrew",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0D1712; --surface:#15231B; --ink:#E4EFE8; --muted:#94AA9C; --line:#284033;
+    --brand:#56C48F; --on-brand:#06200F; --brand-soft:#1B3427;
+    --bad:#FF8E80; --warn:#F0B656; --ok:#7DD08C; color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.wrap{max-width:600px;margin-inline:auto;padding-inline:16px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(96px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:center;gap:12px}
+header img{width:40px;height:40px;border-radius:11px;flex:none}
+header .t{flex:1;min-width:0}
+h1{font-size:1.35rem;margin:0;line-height:1.15;letter-spacing:-.01em}
+h2{font-size:1.1rem;margin:0}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.88rem}
+.view{display:flex;flex-direction:column;gap:14px}
+input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px;min-width:0;font-size:16px}
+textarea{resize:vertical}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:600;min-height:44px}
+button.primary{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+button.quiet{border-color:transparent;background:transparent;color:var(--brand);padding-inline:8px}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+.icon-btn{width:44px;height:44px;padding:0;display:grid;place-items:center;border-radius:50%}
+.icon-btn svg{width:22px;height:22px}
+.addrow{display:flex;gap:8px}
+.addrow input{flex:1}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border-radius:999px;padding:6px 12px;font-size:.9rem;min-height:36px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.add{border-style:dashed}
+.chip.add::before{content:'+ ';color:var(--brand);font-weight:700}
+.label{font-size:.8rem;font-weight:700;color:var(--muted);letter-spacing:.02em;margin:0}
+.rows{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--line);min-height:56px}
+.row:first-child{border-top:0}
+.row .main{flex:1;min-width:0;text-align:start;border:0;background:none;padding:0;font-weight:400;border-radius:6px;min-height:0}
+.name{font-weight:700;overflow-wrap:anywhere}
+.meta{color:var(--muted);font-size:.84rem}
+.group{padding:8px 12px 4px;font-size:.78rem;font-weight:700;color:var(--muted);border-top:1px solid var(--line);background:color-mix(in srgb,var(--bg) 55%,var(--surface))}
+.group:first-child{border-top:0}
+.pill{font-size:.8rem;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent)}
+.pill.bad{color:var(--bad);background:color-mix(in srgb,var(--bad) 14%,transparent)}
+.pill.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 16%,transparent)}
+.pill.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.step{display:flex;align-items:center;gap:2px;flex:none}
+.step button{width:36px;height:36px;min-height:0;padding:0;border-radius:50%;line-height:1;font-size:1.1rem}
+.step span{min-width:24px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.step.sm button{width:30px;height:30px;font-size:1rem}
+.alert{border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line));background:color-mix(in srgb,var(--warn) 9%,var(--surface));border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.alert p{margin:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.card p{margin:0}
+.empty{color:var(--muted);text-align:center;padding:26px 16px;border:1px dashed var(--line);border-radius:16px;margin:0}
+.done .name{text-decoration:line-through;color:var(--muted);font-weight:400}
+.check{width:24px;height:24px;accent-color:var(--brand);flex:none;margin:0}
+.x{border:0;background:none;color:var(--muted);padding:6px 8px;font-size:1.1rem;min-height:0}
+.pick{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:20px 14px;cursor:pointer;position:relative}
+.pick:focus-within{outline:2px solid var(--brand);outline-offset:2px}
+.pick svg{width:30px;height:30px;color:var(--brand)}
+.pick b{font-size:1.05rem}
+.pick span{color:var(--muted);font-size:.9rem}
+.pick input{position:absolute;opacity:0;width:1px;height:1px}
+.draft{display:grid;grid-template-columns:1fr 72px;gap:8px;padding:12px;border-top:1px solid var(--line)}
+.draft:first-child{border-top:0}
+.draft .second{grid-column:1/-1;display:flex;gap:8px;align-items:center}
+.draft .second select,.draft .second input{flex:1}
+.bar{display:flex;gap:8px;flex-wrap:wrap}
+.note{color:var(--muted);font-size:.9rem;margin:0}
+.big{font-size:1.9rem;font-weight:800;margin:0;font-variant-numeric:tabular-nums;line-height:1.2;letter-spacing:-.01em}
+.big .meta{font-weight:400;font-size:.9rem}
+.bars{display:grid;grid-template-columns:auto 1fr auto;gap:8px 10px;align-items:center;font-variant-numeric:tabular-nums}
+.track{height:10px;border-radius:5px;background:color-mix(in srgb,var(--muted) 14%,transparent);min-width:0}
+.fill{height:10px;border-radius:5px;background:var(--brand);min-width:2px}
+.val{font-weight:700;font-size:.9rem}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:.82rem;border-radius:8px;padding:2px 8px;background:var(--brand-soft);color:var(--ink)}
+.tag.miss{background:color-mix(in srgb,var(--warn) 15%,transparent)}
+.meal.done .dish{text-decoration:line-through;color:var(--muted)}
+.meal .head{display:flex;align-items:center;gap:10px}
+.meal .dish{font-weight:800;flex:1}
+.out{white-space:pre-wrap}
+.field{display:flex;flex-direction:column;gap:4px;font-size:.84rem;color:var(--muted);font-weight:600}
+.field.inline{flex-direction:row;align-items:center;gap:10px;font-size:1rem;color:var(--ink);font-weight:400}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.field input:not([type=checkbox]),.field select{width:100%;min-width:0}
+input[type=date]{min-height:46px;-webkit-appearance:none;appearance:none}
+.spin{width:22px;height:22px;flex:none;border-radius:50%;border:3px solid color-mix(in srgb,var(--brand) 30%,transparent);border-top-color:var(--brand);animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.busy{display:flex;align-items:center;gap:10px;color:var(--muted)}
+nav.tabs{position:fixed;inset-inline:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:20}
+nav.tabs div{max-width:600px;margin-inline:auto;display:flex}
+nav.tabs button{flex:1;border:0;border-radius:0;background:none;padding:8px 2px 7px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:.74rem;font-weight:600;position:relative;min-height:56px}
+nav.tabs svg{width:24px;height:24px}
+nav.tabs button[aria-selected=true]{color:var(--brand)}
+nav.tabs .n{position:absolute;top:4px;inset-inline-start:calc(50% + 6px);font-size:.68rem;border-radius:999px;padding:0 6px;line-height:16px;background:var(--brand);color:var(--on-brand);font-variant-numeric:tabular-nums}
+nav.tabs .n.warn{background:var(--warn);color:var(--surface)}
+dialog{border:0;border-radius:20px 20px 0 0;background:var(--surface);color:var(--ink);padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));width:100%;max-width:600px;margin:auto auto 0;max-height:92vh;overflow:auto}
+dialog::backdrop{background:rgba(5,15,10,.5)}
+dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#toast{position:fixed;inset-inline:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin-inline:auto;max-width:440px;background:var(--ink);color:var(--bg);padding:8px 8px 8px 14px;padding-inline-start:16px;border-radius:12px;display:flex;align-items:center;gap:10px;font-weight:600;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.2)}
+#toast span{flex:1}
+#toast button{background:none;border:0;color:var(--brand);font-weight:800;min-height:36px;padding:4px 10px}
+@media (prefers-color-scheme:dark){#toast button{color:#1E7A52}}
+.offline{font-size:.8rem;color:var(--warn)}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="/icons/icon-192.png" alt="">
+    <div class="t">
+      <h1>HaniaCart</h1>
+      <p class="sub" id="summary">טוען…</p>
+    </div>
+    <button class="icon-btn" id="openSettings" type="button" aria-label="הגדרות ושיתוף">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <!-- STOCK -->
+  <section class="view" id="v-stock">
+    <div id="alert" class="alert" hidden></div>
+    <form class="addrow" id="stockAdd">
+      <input type="search" id="stockQ" placeholder="חיפוש או הוספה, למשל: חלב 2" autocomplete="off" aria-label="חיפוש או הוספת מוצר למלאי">
+      <button class="primary" type="submit">הוסף</button>
+    </form>
+    <div class="chips" id="locChips"></div>
+    <div id="stockRows"></div>
+  </section>
+
+  <!-- LIST -->
+  <section class="view" id="v-list" hidden>
+    <form class="addrow" id="listAdd">
+      <input type="text" id="listName" placeholder="מה צריך? אפשר להדביק רשימה שלמה" autocomplete="off" aria-label="מוצר להוספה לרשימת הקניות">
+      <button class="primary" type="submit">הוסף</button>
+    </form>
+    <div id="suggest" class="view"></div>
+    <div id="listRows"></div>
+    <div class="bar">
+      <button class="primary" id="finish" type="button" disabled>סיימתי קנייה, העבר למלאי</button>
+      <button id="waShare" type="button">שליחה בוואטסאפ</button>
+    </div>
+    <p class="note">מסמנים בסופר מה שנכנס לעגלה. "סיימתי קנייה" מעביר את המסומנים למלאי עם תאריך תפוגה משוער. צילום החשבונית בלשונית סריקה מוסיף גם מחירים.</p>
+  </section>
+
+  <!-- MEALS -->
+  <section class="view" id="v-meals" hidden>
+    <div class="card">
+      <h2>תכנון ארוחות</h2>
+      <p class="note">ההצעות מבוססות על מה שיש בבית ומתחילות במה שעומד לפוג. מה שחסר נכנס לרשימה בלחיצה.</p>
+      <div class="two">
+        <label class="field">כמה ארוחות ערב<select id="mCount"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option></select></label>
+        <label class="field">כמה סועדים<input type="number" id="mPeople" min="1" max="20" value="2" inputmode="numeric"></label>
+      </div>
+      <label class="field">העדפות (לא חובה)<input type="text" id="mPrefs" placeholder="למשל: צמחוני, בלי חריף, ילדים בני 5" autocomplete="off"></label>
+      <button class="primary" id="mGo" type="button">תכנן לי ארוחות</button>
+      <div id="mBusy" class="busy" hidden><div class="spin"></div><span>מכין הצעות… זה לוקח כחצי דקה.</span></div>
+      <p class="note" id="mMsg" hidden></p>
+    </div>
+    <div id="planBox" class="view"></div>
+  </section>
+
+  <!-- SCAN -->
+  <section class="view" id="v-scan" hidden>
+    <div id="scanPick" class="view">
+      <label class="pick"><input type="file" accept="image/*" id="fReceipt">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
+        <b>צילום חשבונית</b><span>המוצרים נכנסים למלאי עם מחירים, יורדים מרשימת הקניות, והסכום נרשם בסיכום</span></label>
+      <label class="pick"><input type="file" accept="image/*" id="fShelf">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14M8 6v1M8 13v3"/></svg>
+        <b>צילום מקרר, מקפיא או ארון</b><span>מזהה מה שנראה בתמונה ומוסיף רק מה שעוד לא רשום</span></label>
+    </div>
+    <div id="scanBusy" class="busy" hidden><div class="spin"></div><span>מזהה מוצרים בתמונה… עד דקה.</span></div>
+    <p class="note" id="scanMsg">אפשר לצלם עכשיו או לבחור תמונה מהגלריה, למשל חשבונית שמישהו מהבית שלח בוואטסאפ. לפני השמירה תמיד רואים את הרשימה ומתקנים.</p>
+    <div id="draftBox" hidden class="view">
+      <h2 id="draftTitle"></h2>
+      <div class="rows" id="draftRows"></div>
+      <div class="two" id="draftMeta">
+        <label class="field">רשת<input type="text" id="draftStore" autocomplete="off"></label>
+        <label class="field">סה"כ בשקלים<input type="number" id="draftTotal" min="0" step="0.01" inputmode="decimal"></label>
+      </div>
+      <div class="bar">
+        <button class="primary" id="draftSave" type="button">הוסף למלאי</button>
+        <button id="draftCancel" type="button">בטל</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="view" id="v-stats" hidden>
+    <div id="spendBox" class="view"></div>
+    <div class="card">
+      <h2>מחירים</h2>
+      <input type="search" id="priceQ" placeholder="חיפוש מוצר, למשל: קוטג'" autocomplete="off" aria-label="חיפוש היסטוריית מחיר">
+      <div id="priceBox" class="view"></div>
+    </div>
+    <div id="wasteBox" class="view"></div>
+    <div id="receiptBox" class="view"></div>
+  </section>
+</div>
+
+<nav class="tabs"><div role="tablist">
+  <button role="tab" data-tab="stock" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>מלאי<span class="n warn" id="nStock" hidden></span></button>
+  <button role="tab" data-tab="list" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h3l2.5 12h11L21 7H6"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>קניות<span class="n" id="nList" hidden></span></button>
+  <button role="tab" data-tab="meals" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16v2a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z"/><path d="M2 11h20M9 3c0 2 2 2 2 4M14 3c0 2 2 2 2 4"/></svg>ארוחות</button>
+  <button role="tab" data-tab="scan" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="4"/></svg>סריקה</button>
+  <button role="tab" data-tab="stats" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>סיכום</button>
+</div></nav>
+
+<!-- item editor -->
+<dialog id="dlg">
+  <form id="dlgForm">
+    <div class="sheet-head"><h2>עריכת מוצר</h2><button type="button" class="quiet" id="eClose">סגור</button></div>
+    <label class="field">שם<input type="text" id="eName" required></label>
+    <div class="two">
+      <label class="field">כמות<input type="number" id="eQty" min="0" step="1" inputmode="numeric"></label>
+      <label class="field">תאריך תפוגה<input type="date" id="eExp"></label>
+    </div>
+    <div class="two">
+      <label class="field">מיקום<select id="eLoc"></select></label>
+      <label class="field">קטגוריה<select id="eCat"></select></label>
+    </div>
+    <label class="field inline"><input type="checkbox" class="check" id="eOpen">האריזה נפתחה (מקצר את התפוגה)</label>
+    <label class="field inline"><input type="checkbox" class="check" id="eStaple">מוצר בסיס, תמיד צריך בבית</label>
+    <label class="field" id="eMinWrap">כשנשארות פחות מ־… יחידות, להוסיף לרשימה<input type="number" id="eMin" min="1" max="99" inputmode="numeric"></label>
+    <label class="pick" id="ePhotoWrap"><input type="file" accept="image/*" id="ePhoto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="4"/></svg>
+      <b>צילום תאריך התפוגה מהאריזה</b><span id="ePhotoMsg">התאריך ייקרא וימולא לבד</span></label>
+    <p class="meta" id="ePrice"></p>
+    <div class="bar">
+      <button class="primary" type="submit">שמור</button>
+      <button type="button" id="eOut">נגמר, לרשימה</button>
+      <button type="button" id="eWaste">נזרק</button>
+      <button type="button" class="danger" id="eDel">מחק</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- settings -->
+<dialog id="settings">
+  <div class="sheet">
+    <div class="sheet-head"><h2>הבית שלכם</h2><button type="button" class="quiet" id="sClose">סגור</button></div>
+    <div class="card">
+      <b>שיתוף עם בני הבית</b>
+      <p class="note">שולחים את הקישור לבן או בת הבית. מי שפותח אותו רואה ועורך את אותה רשימה ואותו מלאי, בלי הרשמה. שמרו עליו כמו על מפתח לבית.</p>
+      <input type="text" id="sLink" dir="ltr" readonly aria-label="קישור הצטרפות">
+      <div class="bar">
+        <button class="primary" id="sWa" type="button">שליחה בוואטסאפ</button>
+        <button id="sCopy" type="button">העתקה</button>
+      </div>
+    </div>
+    <label class="field">השם שלך (מופיע ליד מה שהוספת)<input type="text" id="sName" maxlength="30" autocomplete="off" placeholder="למשל: ליאור"></label>
+    <div class="card">
+      <b>התראות</b>
+      <p class="note" id="pushNote">פעם ביום, בשעה שתבחרו: מה עומד לפוג ואילו מוצרי בסיס נגמרו.</p>
+      <div class="two">
+        <label class="field">שעה<select id="pushHour"></select></label>
+        <label class="field inline" style="align-self:end"><input type="checkbox" class="check" id="pushOn">התראות פעילות</label>
+      </div>
+      <button id="pushTest" type="button" hidden>שליחת התראת בדיקה</button>
+    </div>
+    <div class="card" id="installCard">
+      <b>התקנה כאפליקציה</b>
+      <p class="note" id="installNote"></p>
+      <button class="primary" id="installBtn" type="button" hidden>התקנה</button>
+    </div>
+    <details class="card">
+      <summary><b>הצטרפות לבית אחר</b></summary>
+      <p class="note">הדביקו קישור הצטרפות שקיבלתם. מה שרשום כרגע במכשיר הזה יוחלף ברשימה של הבית ההוא.</p>
+      <div class="addrow"><input type="text" id="sJoin" placeholder="קישור הצטרפות" aria-label="קישור הצטרפות"><button id="sJoinGo" type="button">הצטרפות</button></div>
+    </details>
+  </div>
+</dialog>
+
+<!-- join / shared text confirm -->
+<dialog id="ask">
+  <div class="sheet">
+    <h2 id="askTitle"></h2>
+    <p class="note" id="askBody"></p>
+    <div class="bar"><button class="primary" id="askYes" type="button"></button><button id="askNo" type="button">ביטול</button></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status" hidden><span id="toastText"></span><button id="toastAct" type="button" hidden>בטל</button></div>
+
+<script>
+(function () {
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+function h(tag, props) {
+  var e = document.createElement(tag), kids = Array.prototype.slice.call(arguments, 2);
+  for (var k in props || {}) {
+    var v = props[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+    else if (k in e && k !== 'list' && k !== 'style') e[k] = v;
+    else e.setAttribute(k, v);
+  }
+  (function add(list) { list.forEach(function (c) { if (c == null || c === false) return; if (Array.isArray(c)) add(c); else e.append(c.nodeType ? c : String(c)); }); })(kids);
+  return e;
+}
+function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+
+/* ---------- domain ---------- */
+var CATS = {
+  produce: { he: 'פירות וירקות', days: 7, loc: 'fridge', open: 3 },
+  bread: { he: 'לחם ומאפים', days: 4, loc: 'pantry', open: 3 },
+  dairy: { he: 'מוצרי חלב', days: 7, loc: 'fridge', open: 4 },
+  eggs: { he: 'ביצים', days: 28, loc: 'fridge' },
+  meat: { he: 'בשר ודגים', days: 3, loc: 'fridge', open: 2 },
+  frozen: { he: 'קפואים', days: 180, loc: 'freezer' },
+  dry: { he: 'יבשים ושימורים', days: 365, loc: 'pantry' },
+  drinks: { he: 'משקאות', days: 180, loc: 'pantry', open: 5 },
+  cleaning: { he: 'ניקיון וטואלטיקה', days: null, loc: 'other' },
+  other: { he: 'אחר', days: null, loc: 'pantry' }
+};
+var LOCS = { fridge: 'מקרר', freezer: 'מקפיא', pantry: 'מזווה', other: 'ארון ניקיון ושונות' };
+var KW = [
+  ['frozen', ['קפוא', 'גלידה', 'ארטיק']],
+  ['cleaning', ['סבון', 'נייר', 'שמפו', 'אקונומיקה', 'כביסה', 'מרכך', 'טואלט', 'מגבונ', 'שקיות', 'נוזל כלים', 'משחת שיניים', 'דאודורנט', 'ספוג', 'טיטול', 'חיתול']],
+  ['eggs', ['ביצ']],
+  ['dairy', ['חלב', 'גבינ', 'יוגורט', 'שמנת', 'קוטג', 'חמאה', 'מעדן', 'שוקו', 'לבנה', 'צפתית', 'בולגרית']],
+  ['meat', ['עוף', 'בשר', 'דגים', 'סלמון', 'נקניק', 'שניצל', 'המבורגר', 'פסטרמה', 'טחון', 'כבד', 'פרגית', 'הודו', 'טונה טרי']],
+  ['bread', ['לחם', 'פיתות', 'פיתה', 'חלה', 'לחמני', 'בגט', 'טורטי', 'לאפה']],
+  ['produce', ['עגבני', 'מלפפ', 'חסה', 'פלפל', 'בצל', 'תפוח', 'בננ', 'גזר', 'לימון', 'פטרי', 'אבוקדו', 'ענב', 'תפוז', 'כוסברה', 'פטרוזיל', 'קישוא', 'חציל', 'בטטה', 'אבטיח', 'מלון', 'תות', 'כרוב', 'ברוקולי', 'שום', 'נענע', 'שמיר', 'אגס', 'קלמנטינ']],
+  ['drinks', ['מים', 'מיץ', 'קולה', 'בירה', 'יין', 'סודה', 'משקה', 'פריגת']],
+  ['dry', ['אורז', 'פסטה', 'קמח', 'סוכר', 'שמן', 'קפה', 'שימור', 'טונה', 'קורנפלקס', 'עדשים', 'חומוס', 'טחינה', 'רוטב', 'קטשופ', 'מלח', 'פתיתים', 'קוסקוס', 'ביסלי', 'במבה', 'שוקולד', 'עוגיות', 'קרקר', 'דבש', 'ריבה', 'תה', 'שיבולת', 'אטריות', 'פירורי']]
+];
+function guessCat(name) { for (var i = 0; i < KW.length; i++) for (var j = 0; j < KW[i][1].length; j++) if (name.indexOf(KW[i][1][j]) >= 0) return KW[i][0]; return 'other'; }
+function norm(s) { return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase(); }
+function pad(n) { return String(n).padStart(2, '0'); }
+function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function today() { return iso(new Date()); }
+function plusDays(n) { var d = new Date(); d.setDate(d.getDate() + n); return iso(d); }
+function daysBetween(a, b) { return Math.round((Date.parse(b + 'T12:00:00') - Date.parse(a + 'T12:00:00')) / 864e5); }
+function daysLeft(exp) { return daysBetween(today(), exp); }
+function validDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s + 'T00:00')); }
+function dm(s) { var p = String(s || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : ''; }
+function fmt(n) { return '₪' + Math.round(n).toLocaleString('he-IL'); }
+function fmt2(n) { return '₪' + (+n).toFixed(2).replace(/\.00$/, ''); }
+function rid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function parseQty(text) { var t = text.trim().replace(/\s+/g, ' '), m = t.match(/^(.+?)\s*[x×*]?\s*(\d{1,2})$/); return m && m[1].length > 1 ? { name: m[1].trim(), qty: Math.max(1, +m[2]) } : { name: t, qty: 1 }; }
+// Same product: equal names, the shorter is the first words of the longer ("חלב" / "חלב 3%"),
+// or a word of 4+ letters inside it ("עגבניות" / "שרי עגבניות"). "לחם" does not match "פירורי לחם".
+function similar(a, b) {
+  a = norm(a); b = norm(b); if (a.length < 2 || b.length < 2) return false; if (a === b) return true;
+  var s = a.length < b.length ? a : b, l = s === a ? b : a;
+  if (l.indexOf(s + ' ') === 0) return true;
+  return s.length >= 4 && (' ' + l + ' ').indexOf(' ' + s + ' ') >= 0;
+}
+function status(it) {
+  if (it.staple && it.qty <= 0) return { text: 'נגמר', cls: 'bad' };
+  if (!it.exp) return { text: 'ללא תאריך', cls: '' };
+  var d = daysLeft(it.exp);
+  if (d < 0) return { text: d === -1 ? 'פג אתמול' : 'פג לפני ' + (-d) + ' ימים', cls: 'bad' };
+  if (d === 0) return { text: 'פג היום', cls: 'bad' };
+  if (d === 1) return { text: 'מחר', cls: 'warn' };
+  if (d <= 3) return { text: 'עוד ' + d + ' ימים', cls: 'warn' };
+  return { text: 'עד ' + dm(it.exp), cls: '' };
+}
+
+/* ---------- household + sync ---------- */
+var KINDS = ['item', 'list', 'receipt', 'buy', 'waste', 'plan'];
+var HH = ls('hc.hh');
+if (!HH || !/^[A-Za-z0-9_-]{24,48}$/.test(HH)) { HH = Array.from(crypto.getRandomValues(new Uint8Array(24)), function (x) { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789_-'[x % 62]; }).join(''); ls('hc.hh', HH); }
+var ME = ls('hc.name') || '';
+var S = {}; KINDS.forEach(function (k) { S[k] = {}; });
+var since = +(ls('hc.since') || 0), outbox = [], online = true;
+try { var cached = JSON.parse(ls('hc.cache') || 'null'); if (cached) KINDS.forEach(function (k) { S[k] = cached[k] || {}; }); outbox = JSON.parse(ls('hc.out') || '[]'); } catch (e) {}
+function save() { ls('hc.cache', JSON.stringify(S)); ls('hc.out', JSON.stringify(outbox)); ls('hc.since', String(since)); }
+function all(kind) { return Object.keys(S[kind]).map(function (id) { return Object.assign({ id: id }, S[kind][id]); }); }
+
+function api(method, path, body) {
+  var headers = { 'x-hh': HH }; if (body !== undefined) headers['content-type'] = 'application/json';
+  return fetch(path, { method: method, headers: headers, body: body === undefined ? undefined : JSON.stringify(body) }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.error || 'http'); e.code = j.error || 'http'; e.status = r.status; throw e; } return j; });
+  }, function () { var e = new Error('offline'); e.code = 'offline'; throw e; });
+}
+// Every change is applied here first, then queued for the server.
+function put(kind, id, data) {
+  if (data) S[kind][id] = data; else delete S[kind][id];
+  outbox = outbox.filter(function (o) { return !(o.kind === kind && o.id === id); });
+  outbox.push({ kind: kind, id: id, data: data || null });
+  save(); render(); scheduleFlush();
+}
+function strip(row) { var o = Object.assign({}, row); delete o.id; return o; }
+var flushT, flushing = false;
+function scheduleFlush() { clearTimeout(flushT); flushT = setTimeout(flush, 400); }
+function flush() {
+  if (flushing || !outbox.length) return;
+  flushing = true;
+  var batch = outbox.slice(0, 200);
+  api('POST', '/api/sync', { ops: batch }).then(function () {
+    outbox = outbox.filter(function (o) { return batch.indexOf(o) < 0; });
+    online = true; save(); flushing = false;
+    if (outbox.length) flush(); else pull();
+  }, function (e) {
+    flushing = false; online = e.code !== 'offline';
+    if (e.code === 'full') toast('הגעתם לכמות המקסימלית של רשומות. מחקו קבלות או מוצרים ישנים.');
+    else if (e.status === 400) { outbox = outbox.filter(function (o) { return batch.indexOf(o) < 0; }); save(); }
+    renderSummary();
+  });
+}
+var pulling = false;
+function pull() {
+  if (pulling || flushing) return;
+  pulling = true;
+  api('GET', '/api/sync?since=' + since).then(function (j) {
+    pulling = false; online = true;
+    var pending = {}; outbox.forEach(function (o) { pending[o.kind + ':' + o.id] = 1; });
+    if (j.full) KINDS.forEach(function (k) { Object.keys(S[k]).forEach(function (id) { if (!pending[k + ':' + id]) delete S[k][id]; }); });
+    j.rows.forEach(function (r) { if (!S[r.kind] || pending[r.kind + ':' + r.id]) return; if (r.del) delete S[r.kind][r.id]; else S[r.kind][r.id] = r.data; });
+    since = j.now; save(); render();
+  }, function (e) { pulling = false; online = e.code !== 'offline'; renderSummary(); });
+}
+setInterval(function () { if (document.visibilityState === 'visible') { if (outbox.length) flush(); else pull(); } }, 8000);
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { flush(); pull(); } });
+window.addEventListener('online', function () { flush(); pull(); });
+
+/* ---------- toast with undo ---------- */
+var toastT, undoFn = null;
+function toast(msg, undo) {
+  $('toastText').textContent = msg; $('toast').hidden = false;
+  undoFn = undo || null; $('toastAct').hidden = !undo;
+  clearTimeout(toastT); toastT = setTimeout(function () { $('toast').hidden = true; undoFn = null; }, undo ? 6000 : 3200);
+}
+$('toastAct').addEventListener('click', function () { var f = undoFn; undoFn = null; $('toast').hidden = true; if (f) f(); });
+// Snapshot rows before a change so "בטל" can put them back exactly.
+function snap(pairs) { var saved = pairs.map(function (p) { return [p[0], p[1], S[p[0]][p[1]] ? Object.assign({}, S[p[0]][p[1]]) : null]; }); return function () { saved.forEach(function (s) { put(s[0], s[1], s[2]); }); }; }
+
+/* ---------- stock rules ---------- */
+function newItem(name, qty, x) {
+  x = x || {};
+  var cat = CATS[x.cat] ? x.cat : guessCat(name), loc = LOCS[x.loc] ? x.loc : CATS[cat].loc, exp = validDate(x.exp) ? x.exp : null, est = false;
+  if (!exp) {
+    var days = x.shelfDays > 0 ? Math.round(x.shelfDays) : CATS[cat].days;
+    if (days) { exp = plusDays(loc === 'freezer' ? Math.max(days, 90) : days); est = true; }
+  }
+  var q = Math.max(1, Math.round(qty) || 1);
+  return { name: name.trim().slice(0, 80), qty: q, cat: cat, loc: loc, exp: exp, est: est, opened: false, price: x.price > 0 ? Math.round(x.price / q * 100) / 100 : null, staple: false, minq: 1, by: ME, added: Date.now() };
+}
+function openListFor(name) { return all('list').filter(function (l) { return !l.done && similar(l.name, name); })[0]; }
+function addToList(name, qty, auto) {
+  var ex = openListFor(name);
+  if (ex) { if (!auto) put('list', ex.id, Object.assign(strip(ex), { qty: Math.min(99, (ex.qty || 1) + qty) })); return ex.id; }
+  var id = rid();
+  put('list', id, { name: name.trim().slice(0, 80), qty: Math.max(1, Math.min(99, qty)), cat: guessCat(name), done: false, auto: !!auto, by: ME, added: Date.now() });
+  return id;
+}
+// A staple that drops below its minimum goes on the list by itself.
+function checkStaple(it) { if (it.staple && it.qty < (it.minq || 1) && !openListFor(it.name)) { addToList(it.name, Math.max(1, (it.minq || 1) - it.qty), true); return true; } return false; }
+function setQty(it, q) {
+  q = Math.max(0, Math.min(999, q));
+  if (q === 0 && !it.staple) return removeItem(it, 'out');
+  var undo = snap([['item', it.id]]), next = Object.assign(strip(it), { qty: q });
+  put('item', it.id, next);
+  if (checkStaple(Object.assign({ id: it.id }, next))) toast(it.name + ' נכנס לרשימת הקניות', undo);
+}
+function removeItem(it, why) {
+  var pairs = [['item', it.id]], listBefore = Object.keys(S.list);
+  var undo0 = snap(pairs);
+  if (why === 'waste') { var wid = rid(); pairs.push(['waste', wid]); put('waste', wid, { name: it.name, cat: it.cat, qty: Math.max(1, it.qty || 1), price: (it.price || 0) * Math.max(1, it.qty || 1), at: Date.now(), by: ME }); }
+  if (it.staple) put('item', it.id, Object.assign(strip(it), { qty: 0, opened: false }));
+  else put('item', it.id, null);
+  if (why === 'out' || why === 'waste') { if (it.staple) checkStaple(Object.assign({}, it, { qty: 0 })); else if (why === 'out') addToList(it.name, 1, true); }
+  var added = Object.keys(S.list).filter(function (id) { return listBefore.indexOf(id) < 0; });
+  var undo = function () { undo0(); if (why === 'waste') put('waste', pairs[1][1], null); added.forEach(function (id) { put('list', id, null); }); };
+  toast(why === 'waste' ? it.name + ' נרשם כנזרק' : why === 'out' ? it.name + ' עבר לרשימת הקניות' : it.name + ' נמחק', undo);
+}
+
+/* ---------- predictions from purchase history ---------- */
+function purchaseStats() {
+  var by = {};
+  all('buy').forEach(function (b) { if (!b.date) return; var k = norm(b.name); (by[k] = by[k] || { name: b.name, dates: {}, n: 0, last: '' }); by[k].dates[b.date] = 1; by[k].n++; if (b.date >= by[k].last) { by[k].last = b.date; by[k].name = b.name; } });
+  return Object.keys(by).map(function (k) {
+    var o = by[k], ds = Object.keys(o.dates).sort(), gaps = [];
+    for (var i = 1; i < ds.length; i++) gaps.push(daysBetween(ds[i - 1], ds[i]));
+    var avg = gaps.length >= 2 ? gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length : null;
+    return { key: k, name: o.name, n: ds.length, last: o.last, every: avg, dueIn: avg ? Math.round(avg - daysBetween(o.last, today())) : null };
+  });
+}
+function inStock(name) { return all('item').some(function (i) { return i.qty > 0 && similar(i.name, name); }); }
+
+/* ---------- render ---------- */
+var tab = 'stock', locFilter = 'all';
+function setTab(t) {
+  if (['stock', 'list', 'meals', 'scan', 'stats'].indexOf(t) < 0) t = 'stock';
+  tab = t; ls('hc.tab', t);
+  if (location.hash !== '#' + t) history.replaceState(null, '', '#' + t);
+  render(); window.scrollTo(0, 0);
+}
+document.querySelectorAll('nav.tabs button').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+
+function render() {
+  ['stock', 'list', 'meals', 'scan', 'stats'].forEach(function (t) { $('v-' + t).hidden = t !== tab; });
+  document.querySelectorAll('nav.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === tab)); });
+  var urgent = all('item').filter(function (i) { return i.qty > 0 && i.exp && daysLeft(i.exp) <= 3; });
+  var open = all('list').filter(function (l) { return !l.done; }).length;
+  $('nStock').hidden = !urgent.length; $('nStock').textContent = urgent.length;
+  $('nList').hidden = !open; $('nList').textContent = open;
+  renderSummary();
+  if (tab === 'stock') { renderAlert(urgent); renderStock(); }
+  if (tab === 'list') { renderSuggest(); renderList(); }
+  if (tab === 'meals') renderPlan();
+  if (tab === 'stats') renderStats();
+}
+function renderSummary() {
+  var items = all('item').filter(function (i) { return i.qty > 0; }), open = all('list').filter(function (l) { return !l.done; }).length;
+  var soon = items.filter(function (i) { return i.exp && daysLeft(i.exp) <= 3; }).length;
+  $('summary').textContent = items.length + ' מוצרים בבית · ' + (soon ? soon + ' לאכול בקרוב · ' : '') + open + ' ברשימה' + (!online ? ' · אין חיבור, נשמר במכשיר' : outbox.length ? ' · שומר…' : '');
+}
+
+function renderAlert(urgent) {
+  var box = $('alert');
+  box.hidden = !urgent.length;
+  if (!urgent.length) return;
+  urgent.sort(function (a, b) { return a.exp < b.exp ? -1 : 1; });
+  box.replaceChildren(
+    h('p', null, h('b', null, urgent.length === 1 ? 'מוצר אחד צריך תשומת לב' : urgent.length + ' מוצרים צריכים תשומת לב')),
+    h('p', { class: 'meta' }, urgent.map(function (i) { return i.name + ' (' + status(i).text + ')'; }).join(' · ')),
+    h('div', { class: 'bar' }, h('button', { type: 'button', onclick: function () { setTab('meals'); planMeals(3, true); } }, 'מה לבשל מזה?')));
+}
+function renderStock() {
+  var q = norm($('stockQ').value), items = all('item'), counts = { all: items.length };
+  items.forEach(function (i) { counts[i.loc] = (counts[i.loc] || 0) + 1; });
+  $('locChips').replaceChildren.apply($('locChips'), [['all', 'הכול']].concat(Object.keys(LOCS).map(function (k) { return [k, LOCS[k]]; })).map(function (p) {
+    return h('button', { type: 'button', class: 'chip', 'aria-pressed': String(locFilter === p[0]), onclick: function () { locFilter = p[0]; render(); } }, p[1] + ' ' + (counts[p[0]] || 0));
+  }));
+  var shown = items.filter(function (i) { return (locFilter === 'all' || i.loc === locFilter) && (!q || norm(i.name).indexOf(q) >= 0); }).sort(function (a, b) {
+    var za = a.qty <= 0 ? 1 : 0, zb = b.qty <= 0 ? 1 : 0; if (za !== zb) return za - zb;
+    var ea = a.exp || '9999', eb = b.exp || '9999'; return ea < eb ? -1 : ea > eb ? 1 : a.name.localeCompare(b.name, 'he');
+  });
+  var box = $('stockRows');
+  if (!shown.length) {
+    box.replaceChildren(q ? h('p', { class: 'empty' }, 'לא נמצא "' + $('stockQ').value.trim() + '". לחצו "הוסף" כדי להכניס אותו למלאי.')
+      : h('p', { class: 'empty' }, items.length ? 'אין מוצרים במיקום הזה.' : 'המלאי ריק. הוסיפו מוצר למעלה, צלמו חשבונית או את המקרר בלשונית סריקה, או סמנו קנייה ברשימה.'));
+    return;
+  }
+  box.replaceChildren(h('div', { class: 'rows' }, shown.map(function (it) {
+    var st = status(it);
+    var meta = [LOCS[it.loc] || '', it.staple ? 'בסיס' : '', it.opened ? 'נפתח' : '', it.exp && it.est ? 'תאריך משוער' : ''].filter(Boolean).join(' · ');
+    return h('div', { class: 'row' },
+      h('button', { type: 'button', class: 'main', onclick: function () { openEdit(it.id); }, 'aria-label': 'עריכת ' + it.name }, h('div', { class: 'name' }, it.name), h('div', { class: 'meta' }, meta)),
+      h('span', { class: 'pill ' + st.cls }, st.text),
+      h('div', { class: 'step' },
+        h('button', { type: 'button', 'aria-label': 'הפחת אחד', onclick: function () { setQty(it, it.qty - 1); } }, '−'),
+        h('span', null, it.qty),
+        h('button', { type: 'button', 'aria-label': 'הוסף אחד', onclick: function () { setQty(it, it.qty + 1); } }, '+')));
+  })));
+}
+$('stockQ').addEventListener('input', function () { renderStock(); });
+$('stockAdd').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var v = $('stockQ').value.trim(); if (!v) return;
+  var p = parseQty(v), id = rid();
+  put('item', id, newItem(p.name, p.qty));
+  $('stockQ').value = ''; render();
+  toast(p.name + ' נוסף למלאי', function () { put('item', id, null); });
+});
+
+/* list */
+function renderSuggest() {
+  var stats = purchaseStats(), listNames = all('list').map(function (l) { return l.name; });
+  var inList = function (n) { return listNames.some(function (x) { return similar(x, n); }); };
+  var due = stats.filter(function (s) { return s.every && s.n >= 3 && s.dueIn <= 1 && !inList(s.name) && !inStock(s.name); }).sort(function (a, b) { return a.dueIn - b.dueIn; }).slice(0, 8);
+  var freq = stats.filter(function (s) { return daysBetween(s.last, today()) <= 120 && !inList(s.name) && due.indexOf(s) < 0; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 12);
+  var staplesOut = all('item').filter(function (i) { return i.staple && i.qty < (i.minq || 1) && !inList(i.name); });
+  var kids = [];
+  var chip = function (name, title) { return h('button', { type: 'button', class: 'chip add', title: title || '', onclick: function () { addToList(name, 1); toast(name + ' נוסף לרשימה'); } }, name); };
+  if (staplesOut.length) kids.push(h('p', { class: 'label' }, 'מוצרי בסיס שחסרים'), h('div', { class: 'chips' }, staplesOut.map(function (i) { return chip(i.name); })));
+  if (due.length) kids.push(h('p', { class: 'label' }, 'כנראה נגמר בקרוב, לפי הקניות הקודמות'), h('div', { class: 'chips' }, due.map(function (s) { return chip(s.name, 'נקנה בערך כל ' + Math.round(s.every) + ' ימים'); })));
+  if (freq.length) kids.push(h('p', { class: 'label' }, 'קונים הרבה'), h('div', { class: 'chips' }, freq.map(function (s) { return chip(s.name); })));
+  $('suggest').replaceChildren.apply($('suggest'), kids);
+}
+function renderList() {
+  var list = all('list'), box = $('listRows');
+  $('finish').disabled = !list.some(function (l) { return l.done; });
+  $('waShare').disabled = !list.some(function (l) { return !l.done; });
+  if (!list.length) { box.replaceChildren(h('p', { class: 'empty' }, 'הרשימה ריקה. מה שמוסיפים כאן מופיע אצל כל בני הבית. מוצר שנגמר במלאי נכנס לכאן לבד.')); return; }
+  var rows = [];
+  Object.keys(CATS).forEach(function (c) {
+    var g = list.filter(function (l) { return (CATS[l.cat] ? l.cat : 'other') === c; }).sort(function (a, b) { return (a.done - b.done) || (a.added || 0) - (b.added || 0); });
+    if (!g.length) return;
+    rows.push(h('div', { class: 'group' }, CATS[c].he));
+    g.forEach(function (l) {
+      rows.push(h('div', { class: 'row' + (l.done ? ' done' : '') },
+        h('input', { type: 'checkbox', class: 'check', checked: !!l.done, 'aria-label': 'נקנה: ' + l.name, onchange: function (e) { put('list', l.id, Object.assign(strip(l), { done: e.target.checked })); } }),
+        h('div', { class: 'main' }, h('div', { class: 'name' }, l.name), (l.by || l.auto) ? h('div', { class: 'meta' }, l.auto ? 'נוסף אוטומטית' : 'הוסיף/ה ' + l.by) : null),
+        h('div', { class: 'step sm' },
+          h('button', { type: 'button', 'aria-label': 'פחות', onclick: function () { if (l.qty > 1) put('list', l.id, Object.assign(strip(l), { qty: l.qty - 1 })); } }, '−'),
+          h('span', null, l.qty || 1),
+          h('button', { type: 'button', 'aria-label': 'יותר', onclick: function () { put('list', l.id, Object.assign(strip(l), { qty: Math.min(99, (l.qty || 1) + 1) })); } }, '+')),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'הסר את ' + l.name, onclick: function () { var u = snap([['list', l.id]]); put('list', l.id, null); toast(l.name + ' הוסר', u); } }, '✕')));
+    });
+  });
+  box.replaceChildren(h('div', { class: 'rows' }, rows));
+}
+function splitList(text) {
+  var seen = {}, out = [];
+  String(text).split(/[\n,،;]+/).forEach(function (s) {
+    s = s.replace(/^\s*(?:[-•*·✓✔▪◦]+|\d+[.)])\s*/, '').replace(/^\[.*?\]\s*[^:]{0,40}:\s*/, '').trim();
+    if (s.length < 2 || s.length > 80) return;
+    var p = parseQty(s); if (seen[norm(p.name)]) return; seen[norm(p.name)] = 1; out.push(p);
+  });
+  return out.slice(0, 80);
+}
+function addMany(text) {
+  var parts = splitList(text); if (!parts.length) return 0;
+  var before = Object.keys(S.list);
+  parts.forEach(function (p) { addToList(p.name, p.qty); });
+  var added = Object.keys(S.list).filter(function (id) { return before.indexOf(id) < 0; });
+  toast(parts.length === 1 ? parts[0].name + ' נוסף לרשימה' : parts.length + ' מוצרים נוספו לרשימה', function () { added.forEach(function (id) { put('list', id, null); }); });
+  return parts.length;
+}
+$('listAdd').addEventListener('submit', function (e) { e.preventDefault(); var v = $('listName').value.trim(); if (!v) return; addMany(v); $('listName').value = ''; });
+$('listName').addEventListener('paste', function (e) { var t = e.clipboardData && e.clipboardData.getData('text'); if (t && /\n/.test(t.trim())) { e.preventDefault(); addMany(t); } });
+$('finish').addEventListener('click', function () {
+  var done = all('list').filter(function (l) { return l.done; }); if (!done.length) return;
+  var day = today();
+  done.forEach(function (l) {
+    var it = all('item').filter(function (i) { return i.qty <= 0 && similar(i.name, l.name); })[0];
+    if (it) { var fresh = newItem(it.name, l.qty, { cat: it.cat, loc: it.loc }); put('item', it.id, Object.assign(strip(it), { qty: l.qty || 1, exp: fresh.exp, est: fresh.est, opened: false })); }
+    else put('item', rid(), newItem(l.name, l.qty || 1, { cat: l.cat }));
+    put('buy', rid(), { name: l.name, cat: l.cat, qty: l.qty || 1, price: null, store: '', date: day });
+    put('list', l.id, null);
+  });
+  toast(done.length + ' מוצרים עברו למלאי');
+});
+$('waShare').addEventListener('click', function () {
+  var open = all('list').filter(function (l) { return !l.done; }), lines = ['רשימת קניות:'];
+  Object.keys(CATS).forEach(function (c) { open.filter(function (l) { return (CATS[l.cat] ? l.cat : 'other') === c; }).forEach(function (l) { lines.push('• ' + l.name + (l.qty > 1 ? ' ×' + l.qty : '')); }); });
+  window.open('https://wa.me/?text=' + encodeURIComponent(lines.join('\n')), '_blank');
+});
+
+/* meals */
+var planBusy = false, quickPlan = null;
+function aiError(e) {
+  var c = e && e.code;
+  if (c === 'offline') return 'אין חיבור לאינטרנט. נסו שוב כשיש קליטה.';
+  if (c === 'no_ai') return 'הזיהוי החכם עוד לא הופעל בשרת.';
+  if (c === 'limit' || c === 'cap') return 'הגעתם למכסה היומית. נסו שוב מחר.';
+  if (c === 'image') return 'התמונה לא התקבלה. נסו תמונה אחרת.';
+  return 'זה לא הצליח הפעם. נסו שוב.';
+}
+function planMeals(count, quick) {
+  if (planBusy) return;
+  var items = all('item').filter(function (i) { return i.qty > 0 && i.cat !== 'cleaning'; });
+  var urgent = items.filter(function (i) { return i.exp && daysLeft(i.exp) <= 3 && daysLeft(i.exp) >= 0; }).map(function (i) { return i.name; });
+  var have = items.filter(function (i) { return urgent.indexOf(i.name) < 0; }).map(function (i) { return i.name; });
+  var people = Math.max(1, Math.min(20, +$('mPeople').value || 2)), prefs = $('mPrefs').value.trim();
+  planBusy = true; $('mBusy').hidden = false; $('mMsg').hidden = true; $('mGo').disabled = true;
+  api('POST', '/api/meals', { count: count, people: people, urgent: urgent, have: have.slice(0, 120), prefs: prefs }).then(function (j) {
+    planBusy = false; $('mBusy').hidden = true; $('mGo').disabled = false;
+    if (!j.meals || !j.meals.length) { $('mMsg').textContent = 'לא התקבלו הצעות. נסו שוב.'; $('mMsg').hidden = false; return; }
+    if (quick) { quickPlan = j.meals; renderPlan(); return; }
+    quickPlan = null;
+    put('plan', 'current', { created: Date.now(), people: people, prefs: prefs, meals: j.meals });
+  }, function (e) { planBusy = false; $('mBusy').hidden = true; $('mGo').disabled = false; $('mMsg').textContent = aiError(e); $('mMsg').hidden = false; });
+}
+$('mGo').addEventListener('click', function () { ls('hc.prefs', $('mPrefs').value); ls('hc.people', $('mPeople').value); planMeals(+$('mCount').value, false); });
+function missingNotHeld(names) { return names.filter(function (n) { return !inStock(n) && !openListFor(n); }); }
+function addMissing(names) {
+  var miss = missingNotHeld(names); if (!miss.length) { toast('כל מה שצריך כבר בבית או ברשימה'); return; }
+  var before = Object.keys(S.list); miss.forEach(function (n) { addToList(n, 1); });
+  var added = Object.keys(S.list).filter(function (id) { return before.indexOf(id) < 0; });
+  toast(miss.length + ' מוצרים נוספו לרשימה', function () { added.forEach(function (id) { put('list', id, null); }); });
+}
+function mealCard(m, i, plan) {
+  var miss = missingNotHeld(m.missing || []);
+  return h('div', { class: 'card meal' + (m.done ? ' done' : '') },
+    h('div', { class: 'head' },
+      plan ? h('input', { type: 'checkbox', class: 'check', checked: !!m.done, 'aria-label': 'בושל', onchange: function (e) { var p = S.plan.current, meals = p.meals.map(function (x, j) { return j === i ? Object.assign({}, x, { done: e.target.checked }) : x; }); put('plan', 'current', Object.assign({}, p, { meals: meals })); } }) : null,
+      h('span', { class: 'dish' }, m.dish)),
+    m.uses && m.uses.length ? h('div', { class: 'tags' }, m.uses.map(function (u) { return h('span', { class: 'tag' }, u); })) : null,
+    miss.length ? h('div', { class: 'tags' }, miss.map(function (u) { return h('span', { class: 'tag miss' }, 'לקנות: ' + u); })) : null,
+    m.how ? h('p', { class: 'meta out' }, m.how) : null);
+}
+function renderPlan() {
+  var box = $('planBox'), kids = [];
+  if (quickPlan) {
+    var allMiss = [].concat.apply([], quickPlan.map(function (m) { return m.missing || []; }));
+    kids.push(h('div', { class: 'sheet-head' }, h('h2', null, 'מה לבשל ממה שעומד לפוג'), h('button', { type: 'button', class: 'quiet', onclick: function () { quickPlan = null; renderPlan(); } }, 'סגור')));
+    kids.push.apply(kids, quickPlan.map(function (m, i) { return mealCard(m, i, false); }));
+    if (missingNotHeld(allMiss).length) kids.push(h('button', { type: 'button', class: 'primary', onclick: function () { addMissing(allMiss); renderPlan(); } }, 'הוסף את החסרים לרשימה'));
+  }
+  var p = S.plan.current;
+  if (p && p.meals && p.meals.length) {
+    var allM = [].concat.apply([], p.meals.filter(function (m) { return !m.done; }).map(function (m) { return m.missing || []; }));
+    kids.push(h('div', { class: 'sheet-head' }, h('h2', null, 'התוכנית של השבוע'), h('span', { class: 'meta' }, 'נוצרה ' + dm(iso(new Date(p.created))))));
+    kids.push.apply(kids, p.meals.map(function (m, i) { return mealCard(m, i, true); }));
+    kids.push(h('div', { class: 'bar' },
+      missingNotHeld(allM).length ? h('button', { type: 'button', class: 'primary', onclick: function () { addMissing(allM); } }, 'הוסף את כל החסרים לרשימה') : h('p', { class: 'note' }, 'כל מה שצריך לתוכנית כבר בבית או ברשימה.'),
+      h('button', { type: 'button', class: 'danger', onclick: function () { var u = snap([['plan', 'current']]); put('plan', 'current', null); toast('התוכנית נמחקה', u); } }, 'מחק תוכנית')));
+  } else if (!quickPlan) kids.push(h('p', { class: 'empty' }, 'עוד אין תוכנית. בחרו כמה ארוחות ולחצו "תכנן לי ארוחות". התוכנית נשמרת ומופיעה אצל כל בני הבית.'));
+  box.replaceChildren.apply(box, kids);
+}
+
+/* scan */
+var draft = [], draftMode = null, draftDate = null;
+function shrink(file) {
+  return createImageBitmap(file).then(function (bmp) {
+    var max = 1600, k = Math.min(1, max / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.85);
+  }, function () { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(file); }); });
+}
+function scan(file, mode) {
+  if (!file) return;
+  $('draftBox').hidden = true; $('scanPick').hidden = true; $('scanBusy').hidden = false; $('scanMsg').hidden = true;
+  shrink(file).then(function (dataUrl) { return api('POST', '/api/scan', { mode: mode, image: dataUrl.split(',')[1], type: 'image/jpeg' }); }).then(function (r) {
+    $('scanBusy').hidden = true; $('scanMsg').hidden = false;
+    draft = (r.items || []).map(function (x) { var it = newItem(x.name, x.qty, { cat: x.cat, loc: x.loc, exp: x.exp, shelfDays: x.shelfDays, price: x.price }); it.linePrice = x.price; return it; });
+    draftMode = mode; draftDate = r.date && r.date <= today() ? r.date : today();
+    if (!draft.length) { $('scanMsg').textContent = 'לא זוהו מוצרים בתמונה. נסו צילום חד וקרוב יותר, באור טוב.'; $('scanPick').hidden = false; return; }
+    $('draftStore').value = r.store || ''; $('draftTotal').value = r.total || (mode === 'receipt' ? sumPrices() : '');
+    $('scanMsg').textContent = 'בדקו את הרשימה, תקנו ושמרו. תאריכים שלא הופיעו בתמונה הם הערכה לפי סוג המוצר.';
+    renderDraft();
+  }).catch(function (e) { $('scanBusy').hidden = true; $('scanMsg').hidden = false; $('scanMsg').textContent = aiError(e); $('scanPick').hidden = false; });
+}
+function sumPrices() { var s = draft.reduce(function (a, d) { return a + (d.linePrice || 0); }, 0); return s ? s.toFixed(2) : ''; }
+function renderDraft() {
+  $('draftBox').hidden = false; $('draftMeta').hidden = draftMode !== 'receipt';
+  $('draftTitle').textContent = (draftMode === 'receipt' ? 'מהחשבונית: ' : 'מהתמונה: ') + draft.length + ' מוצרים';
+  $('draftRows').replaceChildren.apply($('draftRows'), draft.map(function (d, i) {
+    var sel = h('select', { 'aria-label': 'מיקום', onchange: function (e) { d.loc = e.target.value; } }, Object.keys(LOCS).map(function (k) { return h('option', { value: k }, LOCS[k]); })); sel.value = d.loc;
+    return h('div', { class: 'draft' },
+      h('input', { type: 'text', value: d.name, 'aria-label': 'שם', oninput: function (e) { d.name = e.target.value; } }),
+      h('input', { type: 'number', min: '1', value: d.qty, 'aria-label': 'כמות', oninput: function (e) { var q = Math.max(1, Math.round(+e.target.value) || 1); if (d.linePrice) d.price = Math.round(d.linePrice / q * 100) / 100; d.qty = q; } }),
+      h('div', { class: 'second' }, sel,
+        h('input', { type: 'date', value: d.exp || '', 'aria-label': 'תאריך תפוגה', oninput: function (e) { d.exp = validDate(e.target.value) ? e.target.value : null; d.est = false; } }),
+        d.linePrice ? h('span', { class: 'meta' }, fmt2(d.linePrice)) : null,
+        h('button', { type: 'button', class: 'x', 'aria-label': 'הסר', onclick: function () { draft.splice(i, 1); if (draft.length) renderDraft(); else resetScan(); } }, '✕')));
+  }));
+}
+function resetScan() { draft = []; $('draftBox').hidden = true; $('scanPick').hidden = false; }
+$('draftCancel').addEventListener('click', function () { resetScan(); $('scanMsg').textContent = 'הסריקה בוטלה. לא נשמר דבר.'; });
+$('draftSave').addEventListener('click', function () {
+  var rows = draft.filter(function (d) { return d.name.trim(); }), skipped = 0, cleared = 0, store = $('draftStore').value.trim().slice(0, 40);
+  var items = all('item');
+  if (draftMode === 'shelf') { var b = rows.length; rows = rows.filter(function (d) { return !items.some(function (i) { return i.qty > 0 && similar(i.name, d.name); }); }); skipped = b - rows.length; }
+  rows.forEach(function (d) {
+    var data = { name: d.name.trim().slice(0, 80), qty: d.qty, cat: d.cat, loc: d.loc, exp: d.exp, est: d.est, opened: false, price: d.price, staple: false, minq: 1, by: ME, added: Date.now() };
+    var zero = items.filter(function (i) { return i.qty <= 0 && similar(i.name, d.name); })[0];
+    if (zero) put('item', zero.id, Object.assign(strip(zero), { qty: d.qty, exp: d.exp, est: d.est, price: d.price || zero.price, opened: false }));
+    else put('item', rid(), data);
+    if (draftMode === 'receipt') put('buy', rid(), { name: data.name, cat: d.cat, qty: d.qty, price: d.price, store: store, date: draftDate });
+  });
+  if (draftMode === 'receipt') {
+    all('list').forEach(function (l) { if (rows.some(function (d) { return similar(d.name, l.name); })) { put('list', l.id, null); cleared++; } });
+    var total = +$('draftTotal').value;
+    if (total > 0) put('receipt', rid(), { store: store, date: draftDate, total: total, count: rows.length, by: ME, added: Date.now() });
+  }
+  resetScan();
+  $('scanMsg').textContent = rows.length + ' מוצרים נוספו למלאי' + (cleared ? ', ' + cleared + ' ירדו מרשימת הקניות' : '') + (skipped ? ', ' + skipped + ' כבר היו רשומים' : '') + '.';
+  toast('המלאי עודכן'); setTab('stock');
+});
+$('fReceipt').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; scan(f, 'receipt'); });
+$('fShelf').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; scan(f, 'shelf'); });
+
+/* stats */
+function renderStats() {
+  var now = new Date(), keys = [], sums = {}, receipts = all('receipt');
+  for (var i = 5; i >= 0; i--) keys.push(iso(new Date(now.getFullYear(), now.getMonth() - i, 1)).slice(0, 7));
+  receipts.forEach(function (r) { var k = String(r.date || '').slice(0, 7); sums[k] = (sums[k] || 0) + (+r.total || 0); });
+  var cur = keys[5], prev = keys[4], max = Math.max.apply(null, [1].concat(keys.map(function (k) { return sums[k] || 0; })));
+  var sp = [h('h2', null, 'הוצאות על קניות')];
+  if (!receipts.length) sp.push(h('p', { class: 'empty' }, 'עוד אין חשבוניות. אחרי סריקת החשבונית הראשונה יופיע כאן סיכום חודשי.'));
+  else {
+    sp.push(h('p', { class: 'big' }, fmt(sums[cur] || 0), h('span', { class: 'meta' }, ' החודש · חודש קודם ' + fmt(sums[prev] || 0))));
+    sp.push(h('div', { class: 'bars' }, keys.map(function (k) { return [h('span', { class: 'meta' }, k.slice(5) + '/' + k.slice(2, 4)), h('div', { class: 'track' }, h('div', { class: 'fill', style: 'width:' + ((sums[k] || 0) / max * 100) + '%' })), h('span', { class: 'val' }, fmt(sums[k] || 0))]; })));
+  }
+  $('spendBox').replaceChildren.apply($('spendBox'), [h('div', { class: 'card' }, sp)]);
+
+  var w = all('waste').filter(function (x) { return iso(new Date(x.at || 0)).slice(0, 7) === cur; }), cost = w.reduce(function (s, x) { return s + (+x.price || 0); }, 0);
+  var wk = [h('h2', null, 'נזרק החודש')];
+  if (!w.length) wk.push(h('p', { class: 'note' }, 'לא נרשם שום דבר שנזרק החודש. כשמוצר הולך לפח, פתחו אותו במלאי ולחצו "נזרק".'));
+  else { wk.push(h('p', { class: 'big' }, w.length === 1 ? 'מוצר אחד' : w.length + ' מוצרים', cost ? h('span', { class: 'meta' }, ' · בערך ' + fmt(cost)) : null)); wk.push(h('p', { class: 'meta' }, w.map(function (x) { return x.name; }).join(' · '))); }
+  $('wasteBox').replaceChildren(h('div', { class: 'card' }, wk));
+
+  var rk = [];
+  if (receipts.length) {
+    rk.push(h('h2', null, 'חשבוניות אחרונות'));
+    rk.push(h('div', { class: 'rows' }, receipts.sort(function (a, b) { return (b.date || '') < (a.date || '') ? -1 : 1; }).slice(0, 10).map(function (r) {
+      return h('div', { class: 'row' }, h('div', { class: 'main' }, h('div', { class: 'name' }, r.store || 'חשבונית'), h('div', { class: 'meta' }, dm(r.date) + ' · ' + (r.count || 0) + ' מוצרים' + (r.by ? ' · ' + r.by : ''))),
+        h('span', { class: 'pill' }, fmt(+r.total || 0)),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'מחק חשבונית', onclick: function () { var u = snap([['receipt', r.id]]); put('receipt', r.id, null); toast('החשבונית נמחקה', u); } }, '✕'));
+    })));
+  }
+  $('receiptBox').replaceChildren.apply($('receiptBox'), rk);
+  renderPrices();
+}
+function priceGroups() {
+  var g = {};
+  all('buy').forEach(function (b) { if (!b.price || !b.date) return; var k = norm(b.name); (g[k] = g[k] || []).push(b); });
+  Object.keys(g).forEach(function (k) { g[k].sort(function (a, b) { return a.date < b.date ? -1 : 1; }); });
+  return g;
+}
+function renderPrices() {
+  var g = priceGroups(), q = norm($('priceQ').value), box = $('priceBox'), kids = [];
+  if (!Object.keys(g).length) { box.replaceChildren(h('p', { class: 'note' }, 'מחירים נאספים מהחשבוניות שסורקים. אחרי כמה קניות יופיע כאן מה התייקר ואיפה הכי זול.')); return; }
+  if (q) {
+    var keys = Object.keys(g).filter(function (k) { return k.indexOf(q) >= 0; }).slice(0, 6);
+    if (!keys.length) kids.push(h('p', { class: 'note' }, 'אין היסטוריית מחיר למוצר הזה עדיין.'));
+    keys.forEach(function (k) {
+      var rows = g[k], ps = rows.map(function (r) { return r.price; }), last = rows[rows.length - 1];
+      kids.push(h('div', { class: 'rows' },
+        h('div', { class: 'group' }, last.name + ' · עכשיו ' + fmt2(last.price) + ' · טווח ' + fmt2(Math.min.apply(null, ps)) + '–' + fmt2(Math.max.apply(null, ps))),
+        rows.slice(-6).reverse().map(function (r) { return h('div', { class: 'row' }, h('div', { class: 'main' }, h('div', null, r.store || 'לא ידוע'), h('div', { class: 'meta' }, dm(r.date))), h('span', { class: 'pill' }, fmt2(r.price))); })));
+    });
+  } else {
+    var up = [], cheap = [];
+    Object.keys(g).forEach(function (k) {
+      var rows = g[k], last = rows[rows.length - 1], prev = null;
+      for (var i = rows.length - 2; i >= 0; i--) if (rows[i].date < last.date) { prev = rows[i]; break; }
+      if (prev && last.price > prev.price * 1.05) up.push({ name: last.name, from: prev.price, to: last.price });
+      var st = {}; rows.forEach(function (r) { if (r.store && daysBetween(r.date, today()) <= 120) (st[r.store] = st[r.store] || []).push(r.price); });
+      var names = Object.keys(st);
+      if (names.length >= 2) { var avg = names.map(function (s) { return [s, st[s].reduce(function (a, b) { return a + b; }, 0) / st[s].length]; }).sort(function (a, b) { return a[1] - b[1]; }); if (avg[avg.length - 1][1] > avg[0][1] * 1.05) cheap.push({ name: last.name, store: avg[0][0], price: avg[0][1], other: avg[avg.length - 1] }); }
+    });
+    kids.push(h('p', { class: 'label' }, 'התייקרו בקנייה האחרונה'));
+    kids.push(up.length ? h('div', { class: 'rows' }, up.sort(function (a, b) { return b.to / b.from - a.to / a.from; }).slice(0, 8).map(function (u) { return h('div', { class: 'row' }, h('div', { class: 'main name' }, u.name), h('span', { class: 'meta' }, fmt2(u.from) + ' ← '), h('span', { class: 'pill warn' }, fmt2(u.to))); })) : h('p', { class: 'note' }, 'שום דבר לא התייקר מאז הקנייה הקודמת.'));
+    if (cheap.length) {
+      kids.push(h('p', { class: 'label' }, 'איפה זול יותר'));
+      kids.push(h('div', { class: 'rows' }, cheap.slice(0, 8).map(function (c) { return h('div', { class: 'row' }, h('div', { class: 'main' }, h('div', { class: 'name' }, c.name), h('div', { class: 'meta' }, c.other[0] + ': ' + fmt2(c.other[1]))), h('span', { class: 'pill ok' }, c.store + ' ' + fmt2(c.price))); })));
+    }
+    kids.push(h('p', { class: 'note' }, 'חפשו מוצר כדי לראות את כל היסטוריית המחיר שלו.'));
+  }
+  box.replaceChildren.apply(box, kids);
+}
+$('priceQ').addEventListener('input', renderPrices);
+
+/* item editor */
+var editing = null;
+Object.keys(LOCS).forEach(function (k) { $('eLoc').append(h('option', { value: k }, LOCS[k])); });
+Object.keys(CATS).forEach(function (k) { $('eCat').append(h('option', { value: k }, CATS[k].he)); });
+function openEdit(id) {
+  var it = S.item[id]; if (!it) return; editing = id;
+  $('eName').value = it.name; $('eQty').value = it.qty; $('eExp').value = it.exp || ''; $('eLoc').value = it.loc; $('eCat').value = CATS[it.cat] ? it.cat : 'other';
+  $('eOpen').checked = !!it.opened; $('eStaple').checked = !!it.staple; $('eMin').value = it.minq || 1; $('eMinWrap').hidden = !it.staple;
+  $('ePhotoMsg').textContent = 'התאריך ייקרא וימולא לבד';
+  var hist = (priceGroups()[norm(it.name)] || []);
+  $('ePrice').textContent = it.price ? 'מחיר ליחידה בקנייה האחרונה: ' + fmt2(it.price) + (hist.length > 1 ? ' · נקנה ' + hist.length + ' פעמים' : '') : '';
+  $('dlg').showModal();
+}
+$('eStaple').addEventListener('change', function () { $('eMinWrap').hidden = !$('eStaple').checked; });
+$('eClose').addEventListener('click', function () { $('dlg').close(); });
+function cur() { return Object.assign({ id: editing }, S.item[editing]); }
+$('eDel').addEventListener('click', function () { var it = cur(); $('dlg').close(); var u = snap([['item', it.id]]); put('item', it.id, null); toast(it.name + ' נמחק', u); });
+$('eOut').addEventListener('click', function () { var it = cur(); $('dlg').close(); removeItem(it, 'out'); });
+$('eWaste').addEventListener('click', function () { var it = cur(); $('dlg').close(); removeItem(it, 'waste'); });
+$('dlgForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var it = cur(), name = $('eName').value.trim(); if (!name) return;
+  var cat = $('eCat').value, opened = $('eOpen').checked, exp = validDate($('eExp').value) ? $('eExp').value : null, est = exp === it.exp ? !!it.est : false;
+  if (opened && !it.opened && CATS[cat].open) { var cap = plusDays(CATS[cat].open); if (!exp || cap < exp) { exp = cap; est = true; } }
+  var next = Object.assign(strip(it), { name: name.slice(0, 80), qty: Math.max(0, Math.min(999, Math.round(+$('eQty').value) || 0)), loc: $('eLoc').value, cat: cat, exp: exp, est: est, opened: opened, staple: $('eStaple').checked, minq: Math.max(1, Math.min(99, Math.round(+$('eMin').value) || 1)) });
+  $('dlg').close();
+  if (next.qty === 0 && !next.staple) { removeItem(it, 'out'); return; }
+  put('item', it.id, next);
+  if (checkStaple(Object.assign({ id: it.id }, next))) toast(name + ' נכנס לרשימת הקניות');
+});
+$('ePhoto').addEventListener('change', function (e) {
+  var f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  $('ePhotoMsg').textContent = 'קורא את התאריך…';
+  shrink(f).then(function (d) { return api('POST', '/api/scan', { mode: 'date', image: d.split(',')[1], type: 'image/jpeg' }); }).then(function (r) {
+    if (r.date) { $('eExp').value = r.date; $('ePhotoMsg').textContent = 'נמצא ' + dm(r.date) + '. בדקו ולחצו שמור.'; } else $('ePhotoMsg').textContent = 'לא נמצא תאריך קריא. אפשר להקליד ידנית.';
+  }).catch(function (err) { $('ePhotoMsg').textContent = aiError(err); });
+});
+
+/* settings: share, name, push, install, join */
+function joinLink() { return location.origin + '/#join=' + HH; }
+$('openSettings').addEventListener('click', function () {
+  $('sLink').value = joinLink(); $('sName').value = ME; $('pushOn').checked = ls('hc.push') === '1'; $('pushTest').hidden = ls('hc.push') !== '1';
+  $('pushHour').value = ls('hc.hour') || '9'; updateInstall(); $('settings').showModal();
+});
+$('sClose').addEventListener('click', function () { $('settings').close(); });
+$('sName').addEventListener('change', function () { ME = $('sName').value.trim().slice(0, 30); ls('hc.name', ME); toast('השם נשמר'); });
+$('sWa').addEventListener('click', function () { window.open('https://wa.me/?text=' + encodeURIComponent('הצטרפו לרשימת הקניות והמלאי של הבית ב-HaniaCart: ' + joinLink()), '_blank'); });
+$('sCopy').addEventListener('click', function () {
+  var done = function () { toast('הקישור הועתק'); };
+  if (navigator.clipboard) navigator.clipboard.writeText(joinLink()).then(done, function () { $('sLink').select(); }); else $('sLink').select();
+});
+for (var hr = 6; hr <= 22; hr++) $('pushHour').append(h('option', { value: String(hr) }, pad(hr) + ':00'));
+function b64k(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+function pushReady() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !window.Notification) {
+    $('pushNote').textContent = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'באייפון ההתראות עובדות רק מהאפליקציה המותקנת: בספארי לוחצים שיתוף, "הוספה למסך הבית", ופותחים את HaniaCart מהמסך הראשי.' : 'הדפדפן הזה לא תומך בהתראות. נסו בכרום.';
+    return false;
+  }
+  return true;
+}
+function subscribe() {
+  return Notification.requestPermission().then(function (p) {
+    if (p !== 'granted') throw new Error('denied');
+    return navigator.serviceWorker.ready;
+  }).then(function (reg) {
+    return api('GET', '/api/push/key').then(function (k) { return reg.pushManager.getSubscription().then(function (s) { return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64k(k.key) }); }); });
+  }).then(function (sub) { return api('POST', '/api/push/sub', { sub: sub.toJSON(), hour: +$('pushHour').value }); });
+}
+$('pushOn').addEventListener('change', function () {
+  if (!pushReady()) { $('pushOn').checked = false; return; }
+  if ($('pushOn').checked) subscribe().then(function () { ls('hc.push', '1'); ls('hc.hour', $('pushHour').value); $('pushTest').hidden = false; toast('ההתראות הופעלו'); }, function (e) { $('pushOn').checked = false; toast(e.message === 'denied' ? 'ההתראות חסומות. אפשר לאשר אותן בהגדרות הדפדפן.' : 'ההפעלה נכשלה. נסו שוב.'); });
+  else navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) { if (s) { api('POST', '/api/push/unsub', { endpoint: s.endpoint }).catch(function () {}); return s.unsubscribe(); } }).then(function () { ls('hc.push', null); $('pushTest').hidden = true; toast('ההתראות כובו'); });
+});
+$('pushHour').addEventListener('change', function () { ls('hc.hour', $('pushHour').value); if (ls('hc.push') === '1') subscribe().then(function () { toast('שעת ההתראה עודכנה'); }, function () {}); });
+$('pushTest').addEventListener('click', function () { navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (s) { if (!s) throw new Error('no'); return api('POST', '/api/push/test', { endpoint: s.endpoint }); }).then(function () { toast('נשלחה התראת בדיקה'); }, function () { toast('לא הצלחתי לשלוח. כבו והפעילו מחדש את ההתראות.'); }); });
+var installEvt = null;
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvt = e; updateInstall(); });
+function standalone() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone; }
+function updateInstall() {
+  if (standalone()) { $('installCard').hidden = true; return; }
+  $('installCard').hidden = false; $('installBtn').hidden = !installEvt;
+  $('installNote').textContent = installEvt ? 'מוסיפים את HaniaCart למסך הבית ופותחים כמו כל אפליקציה.' : /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'בספארי: כפתור השיתוף, ואז "הוספה למסך הבית".' : 'בתפריט הדפדפן: "התקנת אפליקציה" או "הוספה למסך הבית".';
+}
+$('installBtn').addEventListener('click', function () { if (!installEvt) return; installEvt.prompt(); installEvt.userChoice.finally(function () { installEvt = null; updateInstall(); }); });
+
+var askYes = null;
+function ask(title, body, yes, fn) { $('askTitle').textContent = title; $('askBody').textContent = body; $('askYes').textContent = yes; askYes = fn; $('ask').showModal(); }
+$('askYes').addEventListener('click', function () { $('ask').close(); var f = askYes; askYes = null; if (f) f(); });
+$('askNo').addEventListener('click', function () { $('ask').close(); askYes = null; });
+function switchHousehold(key) {
+  HH = key; ls('hc.hh', key); KINDS.forEach(function (k) { S[k] = {}; }); outbox = []; since = 0; save(); render(); pull();
+  toast('הצטרפת לבית המשותף');
+}
+function tryJoin(key) {
+  if (!/^[A-Za-z0-9_-]{24,48}$/.test(key) || key === HH) return;
+  var hasData = Object.keys(S.item).length + Object.keys(S.list).length > 0;
+  if (!hasData) switchHousehold(key);
+  else ask('להצטרף לבית המשותף?', 'הרשימה והמלאי שרשומים עכשיו במכשיר הזה יוחלפו ברשימה של הבית שהזמין אותך.', 'הצטרפות', function () { switchHousehold(key); });
+}
+$('sJoinGo').addEventListener('click', function () { var m = $('sJoin').value.match(/join=([A-Za-z0-9_-]{24,48})/) || $('sJoin').value.trim().match(/^([A-Za-z0-9_-]{24,48})$/); if (!m) { toast('זה לא נראה כמו קישור הצטרפות'); return; } $('settings').close(); tryJoin(m[1]); });
+
+/* ---------- boot ---------- */
+$('mPrefs').value = ls('hc.prefs') || ''; $('mPeople').value = ls('hc.people') || '2';
+var hash = location.hash.slice(1), jm = hash.match(/^join=([A-Za-z0-9_-]{24,48})$/);
+setTab(jm ? 'list' : (['stock', 'list', 'meals', 'scan', 'stats'].indexOf(hash) >= 0 ? hash : ls('hc.tab') || 'stock'));
+if (jm) setTimeout(function () { tryJoin(jm[1]); }, 50);
+window.addEventListener('hashchange', function () { var t = location.hash.slice(1); if (t !== tab && ['stock', 'list', 'meals', 'scan', 'stats'].indexOf(t) >= 0) setTab(t); });
+// Text shared from another app (a WhatsApp message) arrives as ?sx=… and can go straight onto the list.
+var qs = new URLSearchParams(location.search), shared = [qs.get('st'), qs.get('sx'), qs.get('su')].filter(Boolean).join('\n');
+if (shared) {
+  history.replaceState(null, '', location.pathname + location.hash);
+  var parts = splitList(shared);
+  if (parts.length) setTimeout(function () { ask('להוסיף לרשימת הקניות?', parts.map(function (p) { return p.name + (p.qty > 1 ? ' ×' + p.qty : ''); }).join(' · '), 'הוסף ' + parts.length, function () { setTab('list'); addMany(shared); }); }, 80);
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
+flush(); pull();
+})();
+</script>
+</body>
+</html>

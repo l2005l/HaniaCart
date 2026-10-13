@@ -1,0 +1,26 @@
+{
+  "name": "HaniaCart",
+  "short_name": "HaniaCart",
+  "description": "רשימת קניות משותפת, מלאי עם התראות תפוגה, סריקת חשבוניות ותכנון ארוחות.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F1F6F2",
+  "theme_color": "#1E7A52",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "רשימת קניות", "url": "/#list" },
+    { "name": "סריקת חשבונית", "url": "/#scan" }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "params": { "title": "st", "text": "sx", "url": "su" }
+  }
+}

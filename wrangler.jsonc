@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "haniacart",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-30",
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "d1_databases": [{ "binding": "DB", "database_name": "haniacart", "database_id": "REPLACED_BY_DEPLOY", "migrations_dir": "migrations" }],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["0 * * * *"] },
+  "vars": { "AI_DAILY_CAP": "400", "HH_DAILY_SCANS": "40", "CLAUDE_MODEL": "claude-sonnet-5-5" }
+}
