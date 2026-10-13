@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { dueText, ilNow } from '../src/push.js';
+import { gzipSync } from 'node:zlib';
+import { validGtin } from '../src/laib.js';
 import worker, { gtin14, clean, cleanScan, scanPrompt, mealPrompt, looseJson, runReminders, cleanup } from '../src/worker.js';
 
 function fakeD1() {
@@ -157,6 +159,35 @@ test('prices are found by barcode and by name words', async () => {
   assert.equal(s.results.length, 1); assert.equal(s.results[0].chains, 2); assert.equal(s.results[0].min, 14.9);
   assert.equal((await call(env, 'GET', '/api/prices?codes=1')).status, 400, 'needs a household');
   assert.equal(clean('fav', { name: 'קמח', code: '7290000000017' }).code, '07290000000017');
+});
+
+test('Victory and Hyper Cohen are read from the Laib portal when the app asks', async () => {
+  const env = { DB: fakeD1() };
+  const stores = gzipSync(Buffer.from('<?xml version="1.0" encoding="utf-8"?><Root><Stores><Store><StoreId>7</StoreId><StoreName>אשקלון</StoreName><City>אשקלון</City></Store><Store><StoreId>21</StoreId><StoreName>נתיבות</StoreName><City>נתיבות</City></Store></Stores></Root>'));
+  const items = '<Items>' + '<Item><ItemCode>7290000000015</ItemCode><ItemName>קמח כוסמין &quot;זהב&quot;</ItemName><ItemPrice>16.40</ItemPrice><Quantity>1.00</Quantity><UnitQty>קילו</UnitQty></Item>'
+    + '<Item><ItemCode>1234</ItemCode><ItemName>עגבניות</ItemName><ItemPrice>5.9</ItemPrice></Item>'
+    + '<Item><ItemCode>7290000000018</ItemCode><ItemName>בדיקת ספרה שגויה</ItemName><ItemPrice>3</ItemPrice></Item></Items>';
+  const price = gzipSync(Buffer.from('<root>' + items.repeat(1) + '</root>'));
+  const orig = globalThis.fetch, seen = [];
+  globalThis.fetch = async (u) => {
+    u = String(u); seen.push(u);
+    if (u.includes('getfiles')) return new Response(JSON.stringify([
+      { fileName: 'Stores7290696200003-000-202610130500.xml.gz', fileDate: '2026-10-13 05:00:00' },
+      { fileName: 'PriceFull7290696200003-001-007-20261013-050000.xml.gz', branchNumber: '007', fileDate: '2026-10-13 05:00:00' },
+      { fileName: 'PriceFull7290696200003-001-021-20261013-050000.xml.gz', branchNumber: '021', fileDate: '2026-10-13 05:00:00' }]));
+    if (u.includes('Stores')) return new Response(stores);
+    if (u.includes('-021-')) return new Response(price);
+    return new Response('nope', { status: 404 });
+  };
+  try {
+    const r = await (await call(env, 'POST', '/api/prices/refresh', { hh: HH })).json();
+    assert.equal(r.ran, true); assert.equal(r.status.chains['ויקטורי'].count, 1);
+    const row = env.DB.raw.prepare("SELECT * FROM prices WHERE chain='ויקטורי'").get();
+    assert.equal(row.code, '07290000000015'); assert.equal(row.name, 'קמח כוסמין "זהב"'); assert.equal(row.price, 16.4); assert.equal(row.unit, '1 קילו');
+    assert.ok(!seen.some((u) => u.includes('-007-')), 'only the Netivot store is downloaded');
+    assert.equal((await (await call(env, 'POST', '/api/prices/refresh', { hh: HH })).json()).ran, false, 'not again while fresh');
+    assert.equal(validGtin('7290000000018'), '');
+  } finally { globalThis.fetch = orig; }
 });
 
 test('looseJson finds the object inside prose', () => {

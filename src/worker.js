@@ -1,4 +1,7 @@
 import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
+import { gtin14 } from './gtin.js';
+import { refreshLaib } from './laib.js';
+export { gtin14 };
 // HaniaCart API. A household is a long random key both phones keep (sent as x-hh); there are no accounts.
 // Every row the household keeps is stored as JSON and synced by "what changed since".
 // Image and meal features use Claude when ANTHROPIC_KEY is set, otherwise Workers AI.
@@ -18,8 +21,6 @@ const int = (v, lo, hi, d) => { const n = Math.round(+v); return Number.isFinite
 const money = (v) => { const n = +v; return Number.isFinite(n) && n > 0 && n < 100000 ? Math.round(n * 100) / 100 : null; };
 const strs = (a, n, len) => (Array.isArray(a) ? a.slice(0, n).map((x) => str(x, len)).filter(Boolean) : []);
 export const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s + 'T00:00:00Z'));
-// Barcodes are compared as GTIN-14: EAN-13 / UPC-12 / EAN-8 padded with zeros. '' when it is not a barcode.
-export function gtin14(v) { const d = String(v == null ? '' : v).replace(/\D/g, ''); return d.length >= 8 && d.length <= 14 ? d.padStart(14, '0') : ''; }
 const okId = (s) => typeof s === 'string' && /^[A-Za-z0-9_-]{4,40}$/.test(s);
 
 export function hhKey(req) { const t = req.headers.get('x-hh') || ''; return /^[A-Za-z0-9_-]{24,48}$/.test(t) ? t : ''; }
@@ -260,10 +261,29 @@ async function priceProbe(req, env) {
   const all = (await env.DB.prepare("SELECT k,v FROM kv WHERE k LIKE 'probe:%'").all()).results.map((r) => JSON.parse(r.v));
   return json({ this: out, all });
 }
+// Opening the app asks for this; it runs only when Victory and Hyper Cohen are over 18 hours old,
+// and once at a time. It runs here because the Laib portal answers Cloudflare's Israel location.
+async function priceRefresh(req, env) {
+  if (!hhKey(req)) return bad('household');
+  const now = Date.now(), colo = (req.cf && req.cf.colo) || '';
+  if (req.cf && req.cf.country && req.cf.country !== 'IL') return json({ ran: false, reason: 'outside Israel' });
+  const last = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:laib'").first();
+  const st = last ? JSON.parse(last.v) : null;
+  const fresh = st && Object.values(st.chains || {}).every((c) => c.ok) && now - st.ts < 18 * 3600e3;
+  const recentTry = st && now - st.ts < 3 * 3600e3;
+  if (fresh || recentTry) return json({ ran: false, status: st });
+  const lock = await env.DB.prepare("SELECT v FROM kv WHERE k='laib:lock'").first();
+  if (lock && now - +lock.v < 10 * 60e3) return json({ ran: false, busy: true });
+  await env.DB.prepare("INSERT INTO kv (k,v) VALUES ('laib:lock',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(String(now)).run();
+  const status = await refreshLaib(env, colo);
+  await env.DB.prepare("DELETE FROM kv WHERE k='laib:lock'").run();
+  return json({ ran: true, status });
+}
 async function priceStatus(req, env) {
+  const laib = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:laib'").first();
   const row = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:status'").first();
   const count = await env.DB.prepare('SELECT chain, COUNT(*) AS n, MAX(ts) AS ts FROM prices GROUP BY chain').all();
-  return json({ status: row ? JSON.parse(row.v) : null, chains: count.results });
+  return json({ status: row ? JSON.parse(row.v) : null, laib: laib ? JSON.parse(laib.v) : null, chains: count.results });
 }
 
 async function postMeals(req, env) {
@@ -339,6 +359,7 @@ const ROUTES = {
   'GET /api/prices/search': searchPrices,
   'GET /api/prices/status': priceStatus,
   'GET /api/prices/probe': priceProbe,
+  'POST /api/prices/refresh': priceRefresh,
   'POST /api/photo': postPhoto,
   'POST /api/photo/delete': delPhoto,
   'GET /api/push/key': pushKey,
