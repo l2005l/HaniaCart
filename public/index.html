@@ -137,6 +137,10 @@ dialog form.addrow{flex-direction:row;gap:8px}
 .camb svg{width:20px;height:20px}
 .pv-img{width:100%;max-height:55vh;object-fit:contain;border-radius:14px;background:var(--bg)}
 .desc{color:var(--ink);font-size:.86rem}
+.best{font-size:.84rem;color:var(--ok);font-weight:600}
+.promo{font-size:.74rem;font-weight:700;border-radius:6px;padding:1px 6px;color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent);white-space:nowrap}
+.namebtn{border:0;background:none;padding:0;min-height:0;font-weight:inherit;text-align:start;cursor:pointer;color:inherit}
+.basket .row{min-height:44px}
 .cnt{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .row.need{background:var(--brand-soft)}
 #toast{position:fixed;inset-inline:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin-inline:auto;max-width:440px;background:var(--ink);color:var(--bg);padding:8px 8px 8px 14px;padding-inline-start:16px;border-radius:12px;display:flex;align-items:center;gap:10px;font-weight:600;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.2)}
@@ -308,6 +312,17 @@ dialog form.addrow{flex-direction:row;gap:8px}
     <div class="bar">
       <button type="button" class="primary" id="pvRetake">צילום מחדש</button>
       <button type="button" class="danger" id="pvDel">מחיקת התמונה</button>
+    </div>
+    <div class="card">
+      <b>מחירים ברשתות שלכם</b>
+      <label class="field">ברקוד<input type="text" id="pvCode" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="13 ספרות מתחת לפסים" dir="ltr"></label>
+      <div class="bar">
+        <button type="button" id="pvScan">סריקת ברקוד</button>
+        <button type="button" id="pvFind">חיפוש לפי שם</button>
+      </div>
+      <p class="note" id="pvCodeMsg" hidden></p>
+      <div id="pvPrices"></div>
+      <div id="pvResults"></div>
     </div>
   </div>
 </dialog>
@@ -728,6 +743,61 @@ function renderFavs() {
     } }, 'מחק את מה שלא קונים')) : null);
 }
 
+/* barcodes and chain prices */
+function gtin14(v) { var d = String(v == null ? '' : v).replace(/\D/g, ''); return d.length >= 8 && d.length <= 14 ? ('00000000000000' + d).slice(-14) : ''; }
+function showCode(c) { return c ? c.replace(/^0+(?=\d{8,})/, '') : ''; }
+// Chrome on Android reads barcodes from a photo; elsewhere this resolves to '' and the number is typed.
+function readBarcode(file) {
+  if (!('BarcodeDetector' in window)) return Promise.resolve('');
+  return createImageBitmap(file).then(function (bmp) {
+    return new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] }).detect(bmp);
+  }).then(function (codes) { return codes && codes[0] ? gtin14(codes[0].rawValue) : ''; }, function () { return ''; });
+}
+function scanBarcodeFile(file) {
+  $('pvCodeMsg').hidden = false; $('pvCodeMsg').textContent = 'קורא את הברקוד…';
+  readBarcode(file).then(function (c) {
+    if (c) { setCode(c); $('pvCodeMsg').textContent = 'נקרא ברקוד ' + showCode(c) + '.'; }
+    else $('pvCodeMsg').textContent = 'BarcodeDetector' in window ? 'לא הצלחתי לקרוא. צלמו את הפסים מקרוב ובאור טוב, או הקלידו את המספר.' : 'בטלפון הזה אי אפשר לקרוא ברקוד מתמונה. הקלידו את הספרות שמתחת לפסים, או חפשו לפי שם.';
+  });
+}
+var PR = {}, prAsked = {}, prT;
+function loadPrices(codes) {
+  var need = codes.filter(function (c) { return c && !prAsked[c]; }); if (!need.length) return;
+  need.forEach(function (c) { prAsked[c] = Date.now(); });
+  clearTimeout(prT);
+  prT = setTimeout(function () {
+    var ask = Object.keys(prAsked).filter(function (c) { return !(c in PR); }).slice(0, 200); if (!ask.length) return;
+    api('GET', '/api/prices?codes=' + ask.join(',')).then(function (j) {
+      ask.forEach(function (c) { PR[c] = j.prices[c] || []; }); render(); if ($('pview').open && pvId) renderProductPrices();
+    }, function () { ask.forEach(function (c) { delete prAsked[c]; }); });
+  }, 250);
+}
+function eff(p) { return p.pprice || p.price; }
+function cheapest(code) { var r = PR[code]; return r && r.length ? r.slice().sort(function (a, b) { return eff(a) - eff(b); })[0] : null; }
+function listMain(l) {
+  var fv = favFor(l.name), best = fv && fv.code ? cheapest(fv.code) : null;
+  return h('div', { class: 'main' },
+    h('button', { type: 'button', class: 'name namebtn', onclick: function () { openProduct(l.name, l.cat); } }, l.name),
+    fv && fv.desc ? h('div', { class: 'desc' }, fv.desc) : null,
+    best ? h('div', { class: 'best' }, 'הכי זול: ' + best.chain + ' ' + fmt2(eff(best)) + ' ', best.promo ? h('span', { class: 'promo' }, best.promo) : null) : null,
+    (l.by || l.auto) ? h('div', { class: 'meta' }, l.auto ? 'נוסף אוטומטית' : 'הוסיף/ה ' + l.by) : null);
+}
+// What the open list would cost in each chain, from the items that have a barcode.
+function basketCard(items) {
+  var priced = items.map(function (l) { var f = favFor(l.name); return { l: l, rows: f && f.code ? PR[f.code] : null }; }).filter(function (x) { return x.rows && x.rows.length; });
+  if (!priced.length) return null;
+  var chains = {};
+  priced.forEach(function (x) { x.rows.forEach(function (r) { var c = chains[r.chain] = chains[r.chain] || { total: 0, n: 0 }; c.total += eff(r) * (x.l.qty || 1); c.n++; }); });
+  var names = Object.keys(chains).sort(function (a, b) { return (chains[b].n - chains[a].n) || chains[a].total - chains[b].total; });
+  return h('div', { class: 'card basket' },
+    h('b', null, 'כמה תעלה הרשימה בכל רשת'),
+    h('div', { class: 'rows' }, names.map(function (n, i) {
+      var c = chains[n];
+      return h('div', { class: 'row' }, h('div', { class: 'main name' }, n), h('span', { class: 'meta' }, c.n + ' מתוך ' + priced.length), h('span', { class: 'pill' + (i === 0 ? ' ok' : '') }, fmt(c.total)));
+    })),
+    h('p', { class: 'meta' }, priced.length + ' מתוך ' + items.length + ' המוצרים ברשימה מחוברים לברקוד. לחיצה על שם מוצר מחברת אותו.'));
+}
+
 /* product photos: what exactly this family buys */
 var CAM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="4"/></svg>';
 function favFor(name) { return favs().filter(function (f) { return similar(f.name, name); })[0]; }
@@ -736,11 +806,13 @@ var pickFor = null;
 function takePhoto(name, cat) { pickFor = { name: name, cat: cat }; $('pPick').click(); }
 $('pPick').addEventListener('change', function (e) {
   var file = e.target.files[0], t = pickFor; e.target.value = ''; pickFor = null; if (!file || !t) return;
+  if (t.barcode) { scanBarcodeFile(file); return; }
   ensureFav(t.name, t.cat); var f = favFor(t.name); if (!f) return;
   toast('שומר את התמונה…');
   shrink(file, 900).then(function (d) { return api('POST', '/api/photo', { image: d.split(',')[1], type: 'image/jpeg', describe: true, replace: f.photo || undefined }); }).then(function (j) {
     var cur = S.fav[f.id] || strip(f);
     put('fav', f.id, Object.assign({}, cur, { photo: j.id, desc: cur.desc || j.desc || '' }));
+    if (!cur.code) readBarcode(file).then(function (c) { if (c && S.fav[f.id]) { put('fav', f.id, Object.assign({}, S.fav[f.id], { code: c })); toast('גם הברקוד נקרא מהתמונה'); if ($('pview').open && pvId === f.id) openPhoto(f.id); } });
     toast(j.desc && !cur.desc ? 'נשמר: ' + j.desc : 'התמונה נשמרה');
     if ($('pview').open && pvId === f.id) openPhoto(f.id);
   }, function (err) { toast(err.code === 'offline' ? 'אין חיבור. נסו שוב כשיש קליטה.' : err.code === 'full' ? 'הגעתם למספר התמונות המקסימלי. מחקו תמונות ישנות.' : 'שמירת התמונה נכשלה. נסו שוב.'); });
@@ -754,11 +826,63 @@ function photoBtn(name, cat) {
 }
 var pvId = null;
 function openPhoto(id) {
-  var f = S.fav[id]; if (!f) return; pvId = id;
+  var f = S.fav[id]; if (!f) return;
+  if (pvId !== id) { $('pvResults').replaceChildren(); $('pvCodeMsg').hidden = true; }
+  pvId = id;
   $('pvName').textContent = f.name; $('pvDesc').value = f.desc || ''; $('pvImg').src = f.photo ? photoUrl(f.photo) : '';
-  $('pvImg').hidden = !f.photo; $('pvDel').hidden = !f.photo;
+  $('pvImg').hidden = !f.photo; $('pvDel').hidden = !f.photo; $('pvRetake').textContent = f.photo ? 'צילום מחדש' : 'צילום המוצר';
+  $('pvCode').value = showCode(f.code);
+  if (f.code) loadPrices([f.code]);
+  renderProductPrices();
   if (!$('pview').open) $('pview').showModal();
 }
+function openProduct(name, cat) { ensureFav(name, cat); var f = favFor(name); if (f) openPhoto(f.id); }
+function setCode(c) {
+  var f = S.fav[pvId]; if (!f) return;
+  put('fav', pvId, Object.assign({}, f, { code: c })); $('pvCode').value = showCode(c);
+  if (c) loadPrices([c]);
+  renderProductPrices();
+}
+$('pvCode').addEventListener('change', function () {
+  var raw = $('pvCode').value.trim(), c = gtin14(raw);
+  if (raw && !c) { $('pvCodeMsg').hidden = false; $('pvCodeMsg').textContent = 'ברקוד הוא 8 עד 14 ספרות.'; return; }
+  $('pvCodeMsg').hidden = true; setCode(c);
+});
+$('pvScan').addEventListener('click', function () { pickFor = { barcode: true }; $('pPick').click(); });
+$('pvFind').addEventListener('click', function () {
+  var f = S.fav[pvId]; if (!f) return;
+  var box = $('pvResults');
+  box.replaceChildren(h('div', { class: 'busy' }, h('div', { class: 'spin' }), h('span', null, 'מחפש ברשתות…')));
+  api('GET', '/api/prices/search?q=' + encodeURIComponent(f.name)).then(function (j) {
+    if (!j.results.length) { box.replaceChildren(h('p', { class: 'note' }, 'לא נמצא מוצר בשם הזה ברשתות שלכם. נסו לשנות את שם המוצר או לסרוק את הברקוד.')); return; }
+    box.replaceChildren(h('p', { class: 'label' }, 'איזה מהם אתם קונים?'), h('div', { class: 'rows' }, j.results.map(function (r) {
+      return h('div', { class: 'row' },
+        h('div', { class: 'main' }, h('div', { class: 'name' }, r.name), h('div', { class: 'meta' }, 'מ־' + fmt2(r.min) + ' · ב־' + r.chains + (r.chains === 1 ? ' רשת' : ' רשתות'))),
+        h('button', { type: 'button', onclick: function () {
+          var cur = S.fav[pvId];
+          if (cur && !cur.desc) { put('fav', pvId, Object.assign({}, cur, { desc: r.name.slice(0, 120) })); $('pvDesc').value = r.name; }
+          setCode(r.code); box.replaceChildren();
+        } }, 'זה'));
+    })));
+  }, function (e) { box.replaceChildren(h('p', { class: 'note' }, e.code === 'offline' ? 'אין חיבור לאינטרנט.' : 'החיפוש לא הצליח. נסו שוב.')); });
+});
+function renderProductPrices() {
+  var f = S.fav[pvId], box = $('pvPrices'); if (!f) return;
+  if (!f.code) { box.replaceChildren(h('p', { class: 'note' }, 'סרקו את הברקוד או חפשו לפי שם, ואז יופיע כאן המחיר בכל אחת מהרשתות שלכם.')); return; }
+  var rows = PR[f.code];
+  if (!rows) { box.replaceChildren(h('div', { class: 'busy' }, h('div', { class: 'spin' }), h('span', null, 'טוען מחירים…'))); return; }
+  if (!rows.length) { box.replaceChildren(h('p', { class: 'note' }, 'אין מחיר לברקוד הזה ברשתות שלכם. אולי הוא לא נמכר בהן, או שהברקוד שגוי.')); return; }
+  var day = new Date(Math.max.apply(null, rows.map(function (r) { return r.ts; })));
+  box.replaceChildren(
+    h('div', { class: 'rows' }, rows.slice().sort(function (a, b) { return eff(a) - eff(b); }).map(function (r, i) {
+      return h('div', { class: 'row' },
+        h('div', { class: 'main' }, h('div', { class: 'name' }, r.chain), h('div', { class: 'meta' }, r.store + (r.unit ? ' · ' + r.unit : ''))),
+        r.promo ? h('span', { class: 'promo' }, r.promo) : null,
+        h('span', { class: 'pill' + (i === 0 ? ' ok' : '') }, fmt2(eff(r))));
+    })),
+    h('p', { class: 'meta' }, 'לפי קובצי המחירים של הרשתות מ־' + dm(iso(day)) + '. במבצע מוצג המחיר ליחידה במבצע.'));
+}
+
 $('pvClose').addEventListener('click', function () { $('pview').close(); });
 $('pvDesc').addEventListener('change', function () { var f = S.fav[pvId]; if (f) put('fav', pvId, Object.assign({}, f, { desc: $('pvDesc').value.trim().slice(0, 120) })); });
 $('pvRetake').addEventListener('click', function () { var f = S.fav[pvId]; if (f) takePhoto(f.name, f.cat); });
@@ -787,7 +911,9 @@ function renderList() {
   $('finish').disabled = !list.some(function (l) { return l.done; });
   $('waShare').disabled = !list.some(function (l) { return !l.done; });
   if (!list.length) { box.replaceChildren(h('p', { class: 'empty' }, 'הרשימה ריקה. מה שמוסיפים כאן מופיע אצל כל בני הבית. מוצר שנגמר במלאי נכנס לכאן לבד.')); return; }
-  var rows = [];
+  var rows = [], openItems = list.filter(function (l) { return !l.done; });
+  loadPrices(openItems.map(function (l) { var f = favFor(l.name); return f && f.code; }).filter(Boolean));
+  var basket = basketCard(openItems);
   Object.keys(CATS).forEach(function (c) {
     var g = list.filter(function (l) { return (CATS[l.cat] ? l.cat : 'other') === c; }).sort(function (a, b) { return (a.done - b.done) || (a.added || 0) - (b.added || 0); });
     if (!g.length) return;
@@ -796,7 +922,7 @@ function renderList() {
       rows.push(h('div', { class: 'row' + (l.done ? ' done' : '') },
         h('input', { type: 'checkbox', class: 'check', checked: !!l.done, 'aria-label': 'נקנה: ' + l.name, onchange: function (e) { put('list', l.id, Object.assign(strip(l), { done: e.target.checked })); } }),
         photoBtn(l.name, l.cat),
-        (function () { var fv = favFor(l.name); return h('div', { class: 'main' }, h('div', { class: 'name' }, l.name), fv && fv.desc ? h('div', { class: 'desc' }, fv.desc) : null, (l.by || l.auto) ? h('div', { class: 'meta' }, l.auto ? 'נוסף אוטומטית' : 'הוסיף/ה ' + l.by) : null); })(),
+        listMain(l),
         h('div', { class: 'step sm' },
           h('button', { type: 'button', 'aria-label': 'פחות', onclick: function () { if (l.qty > 1) put('list', l.id, Object.assign(strip(l), { qty: l.qty - 1 })); } }, '−'),
           h('span', null, l.qty || 1),
@@ -804,7 +930,7 @@ function renderList() {
         h('button', { type: 'button', class: 'x', 'aria-label': 'הסר את ' + l.name, onclick: function () { var u = snap([['list', l.id]]); put('list', l.id, null); toast(l.name + ' הוסר', u); } }, '✕')));
     });
   });
-  box.replaceChildren(h('div', { class: 'rows' }, rows));
+  box.replaceChildren.apply(box, [basket, h('div', { class: 'rows' }, rows)].filter(Boolean));
 }
 function splitList(text) {
   var seen = {}, out = [];
