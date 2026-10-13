@@ -88,7 +88,10 @@ button:disabled{opacity:.5;cursor:default}
 .pick svg{width:30px;height:30px;color:var(--brand)}
 .pick b{font-size:1.05rem}
 .pick span{color:var(--muted);font-size:.9rem}
-.pick input{position:absolute;opacity:0;width:1px;height:1px}
+.pick input,.linkbtn input{position:absolute;opacity:0;width:1px;height:1px}
+.gallery{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center}
+.linkbtn{position:relative;cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;font-weight:600;color:var(--brand);min-height:44px;display:inline-flex;align-items:center}
+.linkbtn:focus-within{outline:2px solid var(--brand);outline-offset:2px}
 .draft{display:grid;grid-template-columns:1fr 72px;gap:8px;padding:12px;border-top:1px solid var(--line)}
 .draft:first-child{border-top:0}
 .draft .second{grid-column:1/-1;display:flex;gap:8px;align-items:center}
@@ -194,15 +197,22 @@ dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
   <!-- SCAN -->
   <section class="view" id="v-scan" hidden>
     <div id="scanPick" class="view">
-      <label class="pick"><input type="file" accept="image/*" id="fReceipt">
+      <label class="pick"><input type="file" accept="image/*" capture="environment" id="fReceipt">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
         <b>צילום חשבונית</b><span>המוצרים נכנסים למלאי עם מחירים, יורדים מרשימת הקניות, והסכום נרשם בסיכום</span></label>
-      <label class="pick"><input type="file" accept="image/*" id="fShelf">
+      <label class="pick"><input type="file" accept="image/*" capture="environment" id="fShelf">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14M8 6v1M8 13v3"/></svg>
         <b>צילום מקרר, מקפיא או ארון</b><span>מזהה מה שנראה בתמונה ומוסיף רק מה שעוד לא רשום</span></label>
+      <div class="gallery">
+        <span class="meta">יש כבר תמונה בגלריה, למשל חשבונית שנשלחה בוואטסאפ?</span>
+        <div class="bar">
+          <label class="linkbtn"><input type="file" accept="image/*" id="gReceipt">חשבונית מהגלריה</label>
+          <label class="linkbtn"><input type="file" accept="image/*" id="gShelf">מקרר מהגלריה</label>
+        </div>
+      </div>
     </div>
     <div id="scanBusy" class="busy" hidden><div class="spin"></div><span>מזהה מוצרים בתמונה… עד דקה.</span></div>
-    <p class="note" id="scanMsg">אפשר לצלם עכשיו או לבחור תמונה מהגלריה, למשל חשבונית שמישהו מהבית שלח בוואטסאפ. לפני השמירה תמיד רואים את הרשימה ומתקנים.</p>
+    <p class="note" id="scanMsg">לחיצה על כרטיס פותחת את המצלמה. לפני השמירה תמיד רואים את הרשימה ומתקנים.</p>
     <div id="draftBox" hidden class="view">
       <h2 id="draftTitle"></h2>
       <div class="rows" id="draftRows"></div>
@@ -254,7 +264,7 @@ dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
     <label class="field inline"><input type="checkbox" class="check" id="eOpen">האריזה נפתחה (מקצר את התפוגה)</label>
     <label class="field inline"><input type="checkbox" class="check" id="eStaple">מוצר בסיס, תמיד צריך בבית</label>
     <label class="field" id="eMinWrap">כשנשארות פחות מ־… יחידות, להוסיף לרשימה<input type="number" id="eMin" min="1" max="99" inputmode="numeric"></label>
-    <label class="pick" id="ePhotoWrap"><input type="file" accept="image/*" id="ePhoto">
+    <label class="pick" id="ePhotoWrap"><input type="file" accept="image/*" capture="environment" id="ePhoto">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="4"/></svg>
       <b>צילום תאריך התפוגה מהאריזה</b><span id="ePhotoMsg">התאריך ייקרא וימולא לבד</span></label>
     <p class="meta" id="ePrice"></p>
@@ -789,6 +799,8 @@ $('draftSave').addEventListener('click', function () {
 });
 $('fReceipt').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; scan(f, 'receipt'); });
 $('fShelf').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; scan(f, 'shelf'); });
+$('gReceipt').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; scan(f, 'receipt'); });
+$('gShelf').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; scan(f, 'shelf'); });
 
 /* stats */
 function renderStats() {
