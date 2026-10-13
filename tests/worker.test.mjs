@@ -55,7 +55,7 @@ test('rows are cleaned to their shape', () => {
   assert.deepEqual(Object.keys(it).sort(), ['added', 'by', 'cat', 'est', 'exp', 'loc', 'minq', 'name', 'opened', 'price', 'qty', 'staple']);
   assert.equal(it.name, 'גבינה'); assert.equal(it.qty, 999); assert.equal(it.cat, 'other'); assert.equal(it.loc, 'pantry'); assert.equal(it.exp, null); assert.equal(it.price, null);
   assert.equal(clean('list', { name: '' }), null);
-  assert.deepEqual(clean('fav', { name: 'טחינה', cat: 'dry', added: 5, junk: 1 }), { name: 'טחינה', cat: 'dry', added: 5 });
+  assert.deepEqual(clean('fav', { name: 'טחינה', cat: 'dry', added: 5, junk: 1 }), { name: 'טחינה', cat: 'dry', added: 5, photo: '', desc: '' });
   assert.equal(clean('plan', { meals: [{ dish: 'שקשוקה', uses: ['ביצים'], missing: [] }, { dish: '' }] }).meals.length, 1);
 });
 
@@ -128,6 +128,20 @@ test('cleanup forgets old tombstones', async () => {
   env.DB.raw.prepare("INSERT INTO rows (hh,kind,id,data,upd,del) VALUES (?,'list','old1x','{}',0,1)").run(HH);
   await cleanup(env, Date.now());
   assert.equal(env.DB.raw.prepare('SELECT COUNT(*) AS c FROM rows').get().c, 0);
+});
+
+test('a product photo is stored, described, served and replaced', async () => {
+  const env = { DB: fakeD1(), AI: { run: async () => ({ response: '{"name":"קמח כוסמין","desc":"קמח כוסמין 80%, זהב, 1 ק״ג"}' }) } };
+  const img = Buffer.from('fake-jpeg-bytes').toString('base64');
+  const r = await (await call(env, 'POST', '/api/photo', { hh: HH, body: { image: img, describe: true } })).json();
+  assert.match(r.id, /^p/); assert.match(r.desc, /זהב/); assert.equal(r.name, 'קמח כוסמין');
+  const got = await call(env, 'GET', '/api/photo/' + HH + '/' + r.id);
+  assert.equal(got.status, 200); assert.equal(Buffer.from(await got.arrayBuffer()).toString(), 'fake-jpeg-bytes');
+  assert.equal((await call(env, 'GET', '/api/photo/' + HH2 + '/' + r.id)).status, 404, 'another household cannot read it');
+  const r2 = await (await call(env, 'POST', '/api/photo', { hh: HH, body: { image: img, replace: r.id } })).json();
+  assert.equal((await call(env, 'GET', '/api/photo/' + HH + '/' + r.id)).status, 404, 'the replaced photo is gone');
+  assert.equal(r2.desc, '');
+  assert.deepEqual(clean('fav', { name: 'קמח', photo: r2.id, desc: 'x' }).photo, r2.id);
 });
 
 test('looseJson finds the object inside prose', () => {

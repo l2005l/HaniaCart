@@ -132,6 +132,11 @@ dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
 dialog form.addrow{flex-direction:row;gap:8px}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 #favs{height:96vh}
+.thumb{width:46px;height:46px;border-radius:10px;object-fit:cover;flex:none;border:1px solid var(--line);padding:0;background:var(--surface);cursor:pointer;display:block}
+.camb{width:40px;height:40px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--muted)}
+.camb svg{width:20px;height:20px}
+.pv-img{width:100%;max-height:55vh;object-fit:contain;border-radius:14px;background:var(--bg)}
+.desc{color:var(--ink);font-size:.86rem}
 .cnt{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .row.need{background:var(--brand-soft)}
 #toast{position:fixed;inset-inline:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin-inline:auto;max-width:440px;background:var(--ink);color:var(--bg);padding:8px 8px 8px 14px;padding-inline-start:16px;border-radius:12px;display:flex;align-items:center;gap:10px;font-weight:600;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.2)}
@@ -293,6 +298,20 @@ dialog form.addrow{flex-direction:row;gap:8px}
     <div id="favPrune"></div>
   </div>
 </dialog>
+
+<!-- product photo -->
+<dialog id="pview">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="pvName"></h2><button type="button" class="quiet" id="pvClose">סגור</button></div>
+    <img id="pvImg" alt="" class="pv-img">
+    <label class="field">התיאור המדויק (מה לקנות)<input type="text" id="pvDesc" maxlength="120" autocomplete="off" placeholder="למשל: קמח כוסמין 80%, זהב, 1 ק״ג"></label>
+    <div class="bar">
+      <button type="button" class="primary" id="pvRetake">צילום מחדש</button>
+      <button type="button" class="danger" id="pvDel">מחיקת התמונה</button>
+    </div>
+  </div>
+</dialog>
+<input type="file" accept="image/*" capture="environment" id="pPick" hidden>
 
 <!-- settings -->
 <dialog id="settings">
@@ -691,7 +710,8 @@ function renderFavs() {
           if (e.target.checked) addToList(f.name, 1); else { var x = inList(f); if (x) put('list', x.id, null); }
           renderFavs();
         } }),
-        h('span', { class: 'main name' }, f.name),
+        photoBtn(f.name, f.cat),
+        h('span', { class: 'main' }, h('span', { class: 'name' }, f.name), f.desc ? h('div', { class: 'desc' }, f.desc) : null),
         h('span', { class: 'cnt' }, n ? 'נקנה ' + n + (n === 1 ? ' פעם' : ' פעמים') : bc.trips >= 3 ? 'עוד לא נקנה' : ''),
         h('button', { type: 'button', class: 'x', 'aria-label': 'מחיקה מהרשימה הקבועה: ' + f.name, onclick: function (e) { e.preventDefault(); var u = snap([['fav', f.id]]); put('fav', f.id, null); renderFavs(); toast(f.name + ' נמחק מהרשימה הקבועה', function () { u(); renderFavs(); }); } }, '✕')));
     });
@@ -707,6 +727,46 @@ function renderFavs() {
       });
     } }, 'מחק את מה שלא קונים')) : null);
 }
+
+/* product photos: what exactly this family buys */
+var CAM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 8h4l2-3h6l2 3h4v12H3z"/><circle cx="12" cy="13" r="4"/></svg>';
+function favFor(name) { return favs().filter(function (f) { return similar(f.name, name); })[0]; }
+function photoUrl(id) { return '/api/photo/' + HH + '/' + id; }
+var pickFor = null;
+function takePhoto(name, cat) { pickFor = { name: name, cat: cat }; $('pPick').click(); }
+$('pPick').addEventListener('change', function (e) {
+  var file = e.target.files[0], t = pickFor; e.target.value = ''; pickFor = null; if (!file || !t) return;
+  ensureFav(t.name, t.cat); var f = favFor(t.name); if (!f) return;
+  toast('שומר את התמונה…');
+  shrink(file, 900).then(function (d) { return api('POST', '/api/photo', { image: d.split(',')[1], type: 'image/jpeg', describe: true, replace: f.photo || undefined }); }).then(function (j) {
+    var cur = S.fav[f.id] || strip(f);
+    put('fav', f.id, Object.assign({}, cur, { photo: j.id, desc: cur.desc || j.desc || '' }));
+    toast(j.desc && !cur.desc ? 'נשמר: ' + j.desc : 'התמונה נשמרה');
+    if ($('pview').open && pvId === f.id) openPhoto(f.id);
+  }, function (err) { toast(err.code === 'offline' ? 'אין חיבור. נסו שוב כשיש קליטה.' : err.code === 'full' ? 'הגעתם למספר התמונות המקסימלי. מחקו תמונות ישנות.' : 'שמירת התמונה נכשלה. נסו שוב.'); });
+});
+// The thumbnail (or a camera button when there is no photo yet) shown beside a product.
+function photoBtn(name, cat) {
+  var f = favFor(name);
+  if (f && f.photo) return h('button', { type: 'button', class: 'thumb', 'aria-label': 'התמונה של ' + name, onclick: function (e) { e.preventDefault(); openPhoto(f.id); }, style: 'background:center/cover no-repeat url(' + photoUrl(f.photo) + ')' });
+  var b = h('button', { type: 'button', class: 'camb quiet', 'aria-label': 'צילום המוצר המדויק: ' + name, title: 'צילום המוצר המדויק', onclick: function (e) { e.preventDefault(); takePhoto(name, cat); } });
+  b.innerHTML = CAM_SVG; return b;
+}
+var pvId = null;
+function openPhoto(id) {
+  var f = S.fav[id]; if (!f) return; pvId = id;
+  $('pvName').textContent = f.name; $('pvDesc').value = f.desc || ''; $('pvImg').src = f.photo ? photoUrl(f.photo) : '';
+  $('pvImg').hidden = !f.photo; $('pvDel').hidden = !f.photo;
+  if (!$('pview').open) $('pview').showModal();
+}
+$('pvClose').addEventListener('click', function () { $('pview').close(); });
+$('pvDesc').addEventListener('change', function () { var f = S.fav[pvId]; if (f) put('fav', pvId, Object.assign({}, f, { desc: $('pvDesc').value.trim().slice(0, 120) })); });
+$('pvRetake').addEventListener('click', function () { var f = S.fav[pvId]; if (f) takePhoto(f.name, f.cat); });
+$('pvDel').addEventListener('click', function () {
+  var f = S.fav[pvId]; if (!f || !f.photo) return;
+  api('POST', '/api/photo/delete', { id: f.photo }).catch(function () {});
+  put('fav', pvId, Object.assign({}, f, { photo: '' })); $('pview').close(); toast('התמונה נמחקה');
+});
 
 /* list */
 function renderSuggest() {
@@ -735,7 +795,8 @@ function renderList() {
     g.forEach(function (l) {
       rows.push(h('div', { class: 'row' + (l.done ? ' done' : '') },
         h('input', { type: 'checkbox', class: 'check', checked: !!l.done, 'aria-label': 'נקנה: ' + l.name, onchange: function (e) { put('list', l.id, Object.assign(strip(l), { done: e.target.checked })); } }),
-        h('div', { class: 'main' }, h('div', { class: 'name' }, l.name), (l.by || l.auto) ? h('div', { class: 'meta' }, l.auto ? 'נוסף אוטומטית' : 'הוסיף/ה ' + l.by) : null),
+        photoBtn(l.name, l.cat),
+        (function () { var fv = favFor(l.name); return h('div', { class: 'main' }, h('div', { class: 'name' }, l.name), fv && fv.desc ? h('div', { class: 'desc' }, fv.desc) : null, (l.by || l.auto) ? h('div', { class: 'meta' }, l.auto ? 'נוסף אוטומטית' : 'הוסיף/ה ' + l.by) : null); })(),
         h('div', { class: 'step sm' },
           h('button', { type: 'button', 'aria-label': 'פחות', onclick: function () { if (l.qty > 1) put('list', l.id, Object.assign(strip(l), { qty: l.qty - 1 })); } }, '−'),
           h('span', null, l.qty || 1),
@@ -848,9 +909,9 @@ function renderPlan() {
 
 /* scan */
 var draft = [], draftMode = null, draftDate = null;
-function shrink(file) {
+function shrink(file, maxSide) {
   return createImageBitmap(file).then(function (bmp) {
-    var max = 1600, k = Math.min(1, max / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
+    var max = maxSide || 1600, k = Math.min(1, max / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas');
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
     c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
     return c.toDataURL('image/jpeg', 0.85);
