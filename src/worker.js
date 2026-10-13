@@ -246,6 +246,20 @@ async function searchPrices(req, env, url) {
     .bind(...words.map((w) => '%' + w + '%')).all();
   return json({ results: results.map((r) => ({ code: r.code, name: r.name, min: r.min, chains: r.chains })) });
 }
+// Can this Cloudflare location reach the Laib portal (Victory, Hyper Cohen)? It times out from GitHub's servers.
+async function priceProbe(req, env) {
+  const t0 = Date.now(), colo = (req.cf && req.cf.colo) || '';
+  let out;
+  try {
+    const r = await fetch('https://laibcatalog.co.il/webapi/api/getfiles?edi=7290696200003', { signal: AbortSignal.timeout(12000), headers: { 'user-agent': 'Mozilla/5.0 HaniaCart' } });
+    const text = await r.text();
+    let n = null; try { n = JSON.parse(text).length; } catch {}
+    out = { ok: r.ok, status: r.status, files: n, ms: Date.now() - t0, colo };
+  } catch (e) { out = { ok: false, error: String(e && e.name || e), ms: Date.now() - t0, colo }; }
+  await env.DB.prepare('INSERT INTO kv (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('probe:' + colo, JSON.stringify(Object.assign({ at: Date.now() }, out))).run();
+  const all = (await env.DB.prepare("SELECT k,v FROM kv WHERE k LIKE 'probe:%'").all()).results.map((r) => JSON.parse(r.v));
+  return json({ this: out, all });
+}
 async function priceStatus(req, env) {
   const row = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:status'").first();
   const count = await env.DB.prepare('SELECT chain, COUNT(*) AS n, MAX(ts) AS ts FROM prices GROUP BY chain').all();
@@ -324,6 +338,7 @@ const ROUTES = {
   'GET /api/prices': getPrices,
   'GET /api/prices/search': searchPrices,
   'GET /api/prices/status': priceStatus,
+  'GET /api/prices/probe': priceProbe,
   'POST /api/photo': postPhoto,
   'POST /api/photo/delete': delPhoto,
   'GET /api/push/key': pushKey,

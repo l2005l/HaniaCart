@@ -106,6 +106,7 @@ def run(ilp, configs, now=None):
             st["candidates"] = near
             if not store:
                 st["error"] = "no matching store"
+                st["all_stores"] = [f"{s.store_id}: {store_text(s)}"[:70] for s in stores][:160]
                 continue
             st["store"] = store_text(store)[:120]
             st["store_id"] = store.store_id
