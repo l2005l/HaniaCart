@@ -7,5 +7,17 @@
   "d1_databases": [{ "binding": "DB", "database_name": "haniacart", "database_id": "REPLACED_BY_DEPLOY", "migrations_dir": "migrations" }],
   "ai": { "binding": "AI" },
   "triggers": { "crons": ["0 * * * *"] },
-  "vars": { "AI_DAILY_CAP": "400", "HH_DAILY_SCANS": "40", "CLAUDE_MODEL": "claude-sonnet-5-5" }
+  "vars": { "AI_DAILY_CAP": "400", "HH_DAILY_SCANS": "40", "CLAUDE_MODEL": "claude-sonnet-5-5" },
+  "env": {
+    // Staging: its own database, no scheduled jobs, and the Hania360 account turned on
+    // through Hania Pass staging. Production gets the PASS binding once Hania Pass is live.
+    "staging": {
+      "name": "haniacart-staging",
+      "d1_databases": [{ "binding": "DB", "database_name": "haniacart-staging", "database_id": "STAGING_DB_ID_FROM_DEPLOY", "migrations_dir": "migrations" }],
+      "ai": { "binding": "AI" },
+      "triggers": { "crons": [] },
+      "vars": { "AI_DAILY_CAP": "50", "HH_DAILY_SCANS": "10", "CLAUDE_MODEL": "claude-sonnet-5-5" },
+      "services": [{ "binding": "PASS", "service": "hania-pass-staging" }]
+    }
+  }
 }

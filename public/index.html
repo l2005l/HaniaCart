@@ -341,6 +341,14 @@ dialog form.addrow{flex-direction:row;gap:8px}
         <button id="sCopy" type="button">העתקה</button>
       </div>
     </div>
+    <div class="card" id="accCard" hidden>
+      <b>חשבון Hania360</b>
+      <p class="note" id="accNote"></p>
+      <a class="primary" id="accSignIn" href="#" hidden>כניסה לחשבון Hania360</a>
+      <button class="primary" id="accLink" type="button" hidden>שמירת הבית בחשבון</button>
+      <button id="accUnlink" type="button" hidden>הסרת הבית מהחשבון</button>
+      <div id="accOther" hidden></div>
+    </div>
     <label class="field">השם שלך (מופיע ליד מה שהוספת)<input type="text" id="sName" maxlength="30" autocomplete="off" placeholder="למשל: ליאור"></label>
     <div class="card">
       <b>התראות</b>
@@ -1212,7 +1220,7 @@ $('ePhoto').addEventListener('change', function (e) {
 function joinLink() { return location.origin + '/#join=' + HH; }
 $('openSettings').addEventListener('click', function () {
   $('sLink').value = joinLink(); $('sName').value = ME; $('pushOn').checked = ls('hc.push') === '1'; $('pushTest').hidden = ls('hc.push') !== '1';
-  $('pushHour').value = ls('hc.hour') || '9'; updateInstall(); $('settings').showModal();
+  $('pushHour').value = ls('hc.hour') || '9'; updateInstall(); accLoad(); $('settings').showModal();
 });
 $('sClose').addEventListener('click', function () { $('settings').close(); });
 $('sName').addEventListener('change', function () { ME = $('sName').value.trim().slice(0, 30); ls('hc.name', ME); toast('השם נשמר'); });
@@ -1271,11 +1279,69 @@ function tryJoin(key) {
 }
 $('sJoinGo').addEventListener('click', function () { var m = $('sJoin').value.match(/join=([A-Za-z0-9_-]{24,48})/) || $('sJoin').value.trim().match(/^([A-Za-z0-9_-]{24,48})$/); if (!m) { toast('זה לא נראה כמו קישור הצטרפות'); return; } $('settings').close(); tryJoin(m[1]); });
 
+
+/* ---------- Hania360 account (optional) ---------- */
+// The household stays a key on the phone. Signing in to Hania Pass only lets you keep that
+// key in your account, so a new phone gets the same list after signing in.
+var ACC = { available: false };
+function passBase() {
+  var host = location.hostname;
+  if (host === 'hania360.com' || /\.hania360\.com$/.test(host)) return 'https://pass.hania360.com';
+  if (/\.lior-hania\.workers\.dev$/.test(host)) return 'https://hania-pass-staging.lior-hania.workers.dev';
+  return '';
+}
+function accRender() {
+  var on = ACC.available && passBase();
+  $('accCard').hidden = !on; if (!on) return;
+  $('accSignIn').hidden = $('accLink').hidden = $('accUnlink').hidden = true; $('accOther').hidden = true; $('accOther').textContent = '';
+  if (!ACC.signedIn) {
+    $('accNote').textContent = 'לא חובה. אם תשמרו את הבית בחשבון, בטלפון חדש מספיק להתחבר כדי לקבל את אותה רשימה.';
+    $('accSignIn').href = passBase() + '/?return=' + encodeURIComponent(location.origin + '/#settings');
+    $('accSignIn').hidden = false;
+    return;
+  }
+  $('accNote').textContent = (ACC.linked ? 'הבית הזה שמור בחשבון של ' : 'מחובר כ־') + ACC.email;
+  $('accLink').hidden = !!ACC.linked; $('accUnlink').hidden = !ACC.linked;
+  var others = (ACC.households || []).filter(function (k) { return k !== HH; });
+  if (others.length) {
+    $('accOther').appendChild(h('p', { class: 'note' }, others.length === 1 ? 'יש בחשבון עוד בית שמור:' : 'יש בחשבון עוד ' + others.length + ' בתים שמורים:'));
+    others.forEach(function (k, i) {
+      var b = h('button', { type: 'button' }, 'מעבר לבית ' + (others.length > 1 ? (i + 1) : 'השמור'));
+      b.addEventListener('click', function () { $('settings').close(); tryJoin(k); });
+      $('accOther').appendChild(b);
+    });
+    $('accOther').hidden = false;
+  }
+}
+function accLoad() {
+  if (!passBase()) return Promise.resolve();
+  return fetch('/api/account', { headers: { 'x-hh': HH }, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+    ACC = j || { available: false }; accRender();
+    // A new phone: nothing here yet, and the account already keeps a household. Offer it.
+    var empty = Object.keys(S.item).length + Object.keys(S.list).length === 0;
+    var saved = (ACC.households || []).filter(function (k) { return k !== HH; });
+    if (ACC.signedIn && !ACC.linked && empty && saved.length === 1 && !ls('hc.accAsked')) {
+      ls('hc.accAsked', '1');
+      ask('נמצא בית שמור בחשבון', 'הרשימה והמלאי של הבית ששמרת בחשבון Hania360 יופיעו בטלפון הזה.', 'מעבר לבית השמור', function () { tryJoin(saved[0]); });
+    }
+  }, function () {});
+}
+function accChange(path, done) {
+  fetch(path, { method: 'POST', headers: { 'x-hh': HH, 'content-type': 'application/json' }, credentials: 'same-origin', body: '{}' })
+    .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'http'); return j; }); })
+    .then(function () { toast(done); return accLoad(); }, function (e) { toast(e.message === 'too_many' ? 'אפשר לשמור עד 10 בתים בחשבון' : 'לא הצלחנו לעדכן את החשבון'); });
+}
+$('accLink').addEventListener('click', function () { accChange('/api/account/link', 'הבית נשמר בחשבון'); });
+$('accUnlink').addEventListener('click', function () { accChange('/api/account/unlink', 'הבית הוסר מהחשבון'); });
+
 /* ---------- boot ---------- */
 $('mPrefs').value = ls('hc.prefs') || ''; $('mPeople').value = ls('hc.people') || '2';
 var hash = location.hash.slice(1), jm = hash.match(/^join=([A-Za-z0-9_-]{24,48})$/);
 setTab(jm ? 'list' : (['stock', 'list', 'meals', 'scan', 'stats'].indexOf(hash) >= 0 ? hash : ls('hc.tab') || 'stock'));
 if (jm) setTimeout(function () { tryJoin(jm[1]); }, 50);
+// Back from signing in to Hania360: reopen settings on the account card.
+if (hash === 'settings') setTimeout(function () { history.replaceState(null, '', location.pathname + location.search); $('openSettings').click(); }, 50);
+else if (!jm) accLoad();
 window.addEventListener('hashchange', function () { var t = location.hash.slice(1); if (t !== tab && ['stock', 'list', 'meals', 'scan', 'stats'].indexOf(t) >= 0) setTab(t); });
 // Text shared from another app (a WhatsApp message) arrives as ?sx=… and can go straight onto the list.
 var qs = new URLSearchParams(location.search), shared = [qs.get('st'), qs.get('sx'), qs.get('su')].filter(Boolean).join('\n');

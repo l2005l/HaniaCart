@@ -1,0 +1,67 @@
+name: Deploy HaniaCart staging
+
+# Staging: its own Worker (haniacart-staging) and database, never the live app.
+# Then checks the optional Hania360 account against Hania Pass staging, end to end.
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/hania-pass]
+
+concurrency:
+  group: haniacart-staging
+  cancel-in-progress: true
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CART_URL: https://haniacart-staging.lior-hania.workers.dev
+      PASS_URL: https://hania-pass-staging.lior-hania.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node --test tests/*.test.mjs
+      - name: Stop if the Cloudflare secrets are missing
+        run: test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - run: npm install --no-audit --no-fund
+      - name: Find or create the staging database
+        run: |
+          id=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="haniacart-staging") | .uuid')
+          if [ -z "$id" ]; then npx wrangler d1 create haniacart-staging; id=$(npx wrangler d1 list --json | jq -r '.[] | select(.name=="haniacart-staging") | .uuid'); fi
+          test -n "$id"
+          sed -i "s/STAGING_DB_ID_FROM_DEPLOY/$id/" wrangler.jsonc
+      - run: npx wrangler d1 migrations apply haniacart-staging --remote --env staging
+      - run: npx wrangler deploy --env staging
+
+      - name: Smoke test, with and without a Hania360 account
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do curl -fsS "$CART_URL/api/health" && break; sleep 5; done; echo
+          HH=$(openssl rand -hex 16)
+          # The app works with no account, exactly as before.
+          curl -fsS -H "x-hh: $HH" "$CART_URL/api/sync?since=0" > /dev/null
+          curl -fsS -H "x-hh: $HH" "$CART_URL/api/account" | tee /tmp/a0.json; echo
+          grep -q '"available":true' /tmp/a0.json && grep -q '"signedIn":false' /tmp/a0.json
+          # Sign in on Hania Pass staging (staging shows the link instead of emailing it).
+          curl -fsS -X POST -H 'content-type: application/json' -H "Origin: $PASS_URL" "$PASS_URL/api/auth/link" \
+            -d "{\"email\":\"cart-smoke@example.com\",\"returnTo\":\"$CART_URL/#settings\"}" > /tmp/link.json
+          LINK=$(node -pe 'JSON.parse(require("fs").readFileSync("/tmp/link.json","utf8")).developmentLink')
+          curl -sS -D /tmp/h.txt -o /dev/null "$LINK"
+          grep -i '^location:' /tmp/h.txt | grep -q "$CART_URL/#settings"
+          SESSION=$(grep -i '^set-cookie: hp_session=' /tmp/h.txt | sed -E 's/.*hp_session=([^;]*).*/\1/' | tr -d '\r')
+          C="Cookie: hp_session=$SESSION"
+          # HaniaCart sees the account, saves the household, and a "new phone" finds it.
+          curl -fsS -H "x-hh: $HH" -H "$C" "$CART_URL/api/account" | grep -q '"signedIn":true'
+          curl -fsS -X POST -H 'content-type: application/json' -H "Origin: $CART_URL" -H "x-hh: $HH" -H "$C" "$CART_URL/api/account/link" -d '{}' | grep -q '"linked":true'
+          NEW=$(openssl rand -hex 16)
+          curl -fsS -H "x-hh: $NEW" -H "$C" "$CART_URL/api/account" | tee /tmp/a1.json; echo
+          grep -q "\"households\":\[\"$HH\"\]" /tmp/a1.json
+          # Another site can't change it, and removing it works.
+          test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -H 'Origin: https://evil.example' -H "x-hh: $HH" -H "$C" "$CART_URL/api/account/link" -d '{}')" = 403
+          curl -fsS -X POST -H 'content-type: application/json' -H "Origin: $CART_URL" -H "x-hh: $HH" -H "$C" "$CART_URL/api/account/unlink" -d '{}' | grep -q '"linked":false'
+          echo "HaniaCart staging: works without an account, and the Hania360 account saves and restores the household."
