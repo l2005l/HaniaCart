@@ -1,7 +1,57 @@
 [
-  { "chain": "yochananof", "label": "יוחננוף", "keys": ["נתיבות"], "prefer": ["מנהטן", "מנהטן", "מהדרין"], "city_code": "246" },
-  { "chain": "het-cohen", "label": "היפר כהן", "keys": ["נתיבות"], "prefer": ["היפר"], "city_code": "246" },
-  { "chain": "victory", "label": "ויקטורי", "keys": ["נתיבות"], "prefer": [], "city_code": "246" },
-  { "chain": "rami-levy", "label": "רמי לוי", "keys": ["נועם"], "prefer": ["פארק"], "city_code": "" },
-  { "chain": "carrefour", "label": "קרפור", "keys": ["נתיבות"], "prefer": [], "city_code": "246" }
+  {
+    "chain": "yochananof",
+    "label": "יוחננוף",
+    "keys": [
+      "נתיבות"
+    ],
+    "prefer": [
+      "מנהטן",
+      "מנהטן",
+      "מהדרין"
+    ],
+    "city_code": "246"
+  },
+  {
+    "chain": "het-cohen",
+    "label": "היפר כהן",
+    "keys": [
+      "נתיבות"
+    ],
+    "prefer": [
+      "היפר"
+    ],
+    "city_code": "246"
+  },
+  {
+    "chain": "victory",
+    "label": "ויקטורי",
+    "keys": [
+      "נתיבות"
+    ],
+    "prefer": [],
+    "city_code": "246"
+  },
+  {
+    "chain": "rami-levy",
+    "label": "רמי לוי",
+    "keys": [
+      "נועם"
+    ],
+    "prefer": [
+      "פארק"
+    ],
+    "city_code": "",
+    "store_id": "031",
+    "note": "נתיבות, צומת בית הגדי (פארק נועם)"
+  },
+  {
+    "chain": "carrefour",
+    "label": "קרפור",
+    "keys": [
+      "נתיבות"
+    ],
+    "prefer": [],
+    "city_code": "246"
+  }
 ]
