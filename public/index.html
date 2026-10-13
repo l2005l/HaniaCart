@@ -129,7 +129,11 @@ nav.tabs .n.warn{background:var(--warn);color:var(--surface)}
 dialog{border:0;border-radius:20px 20px 0 0;background:var(--surface);color:var(--ink);padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));width:100%;max-width:600px;margin:auto auto 0;max-height:92vh;overflow:auto}
 dialog::backdrop{background:rgba(5,15,10,.5)}
 dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
+dialog form.addrow{flex-direction:row;gap:8px}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#favs{height:96vh}
+.cnt{font-size:.78rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row.need{background:var(--brand-soft)}
 #toast{position:fixed;inset-inline:16px;bottom:calc(72px + env(safe-area-inset-bottom,0px));margin-inline:auto;max-width:440px;background:var(--ink);color:var(--bg);padding:8px 8px 8px 14px;padding-inline-start:16px;border-radius:12px;display:flex;align-items:center;gap:10px;font-weight:600;z-index:40;box-shadow:0 6px 24px rgba(0,0,0,.2)}
 #toast span{flex:1}
 #toast button{background:none;border:0;color:var(--brand);font-weight:800;min-height:36px;padding:4px 10px}
@@ -168,6 +172,7 @@ dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
       <input type="text" id="listName" placeholder="מה צריך? אפשר להדביק רשימה שלמה" autocomplete="off" aria-label="מוצר להוספה לרשימת הקניות">
       <button class="primary" type="submit">הוסף</button>
     </form>
+    <div id="favEntry"></div>
     <div id="suggest" class="view"></div>
     <div id="listRows"></div>
     <div class="bar">
@@ -275,6 +280,18 @@ dialog form,.sheet{display:flex;flex-direction:column;gap:12px}
       <button type="button" class="danger" id="eDel">מחק</button>
     </div>
   </form>
+</dialog>
+
+<!-- the household's regular list -->
+<dialog id="favs">
+  <div class="sheet">
+    <div class="sheet-head"><h2>הרשימה הקבועה</h2><button type="button" class="quiet" id="favClose">סיום</button></div>
+    <p class="note">מסמנים מה צריך הפעם, וזה נכנס לרשימת הקניות. מוצר שאתם אף פעם לא קונים, מוחקים עם ✕. מה שקונים הכי הרבה עולה למעלה.</p>
+    <input type="search" id="favQ" placeholder="חיפוש ברשימה הקבועה" autocomplete="off" aria-label="חיפוש ברשימה הקבועה">
+    <form class="addrow" id="favAdd"><input type="text" id="favName" placeholder="מוצר שחסר כאן, למשל: חומוס אחלה" autocomplete="off" aria-label="הוספת מוצר לרשימה הקבועה"><button type="submit">הוסף</button></form>
+    <div id="favRows"></div>
+    <div id="favPrune"></div>
+  </div>
 </dialog>
 
 <!-- settings -->
@@ -402,7 +419,7 @@ function status(it) {
 }
 
 /* ---------- household + sync ---------- */
-var KINDS = ['item', 'list', 'receipt', 'buy', 'waste', 'plan'];
+var KINDS = ['item', 'list', 'receipt', 'buy', 'waste', 'plan', 'fav'];
 var HH = ls('hc.hh');
 if (!HH || !/^[A-Za-z0-9_-]{24,48}$/.test(HH)) { HH = Array.from(crypto.getRandomValues(new Uint8Array(24)), function (x) { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789_-'[x % 62]; }).join(''); ls('hc.hh', HH); }
 var ME = ls('hc.name') || '';
@@ -423,8 +440,11 @@ function put(kind, id, data) {
   if (data) S[kind][id] = data; else delete S[kind][id];
   outbox = outbox.filter(function (o) { return !(o.kind === kind && o.id === id); });
   outbox.push({ kind: kind, id: id, data: data || null });
-  save(); render(); scheduleFlush();
+  if (!quiet) { save(); render(); } scheduleFlush();
 }
+var quiet = false;
+// Many changes at once (a starter list, a cleanup) render once at the end.
+function bulk(fn) { quiet = true; try { fn(); } finally { quiet = false; save(); render(); } }
 function strip(row) { var o = Object.assign({}, row); delete o.id; return o; }
 var flushT, flushing = false;
 function scheduleFlush() { clearTimeout(flushT); flushT = setTimeout(flush, 400); }
@@ -542,7 +562,8 @@ function render() {
   $('nList').hidden = !open; $('nList').textContent = open;
   renderSummary();
   if (tab === 'stock') { renderAlert(urgent); renderStock(); }
-  if (tab === 'list') { renderSuggest(); renderList(); }
+  if (tab === 'list') { renderFavEntry(); renderSuggest(); renderList(); }
+  if ($('favs').open) renderFavs();
   if (tab === 'meals') renderPlan();
   if (tab === 'stats') renderStats();
 }
@@ -599,6 +620,93 @@ $('stockAdd').addEventListener('submit', function (e) {
   $('stockQ').value = ''; render();
   toast(p.name + ' נוסף למלאי', function () { put('item', id, null); });
 });
+
+var STARTER = {
+  produce: 'עגבניות, מלפפונים, בצל, תפוחי אדמה, גזר, פלפל אדום, חסה, לימונים, שום, בטטה, קישואים, חצילים, אבוקדו, תפוחים, בננות, תפוזים, ענבים, פטרוזיל, כוסברה, שמיר, פטריות, כרוב',
+  bread: 'לחם, לחמניות, פיתות, חלה, טורטיות, לחם קל',
+  dairy: 'חלב, גבינה לבנה, קוטג׳, גבינה צהובה, יוגורט, שמנת מתוקה, שמנת חמוצה, חמאה, לבן, גבינה בולגרית, מעדנים, שוקו',
+  eggs: 'ביצים',
+  meat: 'חזה עוף, שניצל, כרעיים, שוקיים, בשר טחון, נקניקיות, פסטרמה, סלמון, פילה דג',
+  frozen: 'ירקות קפואים, אפונה קפואה, שעועית ירוקה קפואה, פיצה קפואה, בורקס, שניצל קפוא, גלידה',
+  dry: 'אורז, פסטה, פתיתים, קוסקוס, קמח, סוכר, מלח, שמן קנולה, שמן זית, רסק עגבניות, טונה, תירס בקופסה, חומוס בקופסה, טחינה, קטשופ, מיונז, חרדל, דבש, ריבה, ממרח שוקולד, קפה, תה, קורנפלקס, שיבולת שועל, עדשים, אבקת מרק, פירורי לחם, תבלינים, אגוזים, במבה, ביסלי, צ׳יפס, עוגיות, קרקרים, שוקולד, חטיפי דגנים',
+  drinks: 'מים מינרליים, סודה, מיץ, קולה, בירה, יין',
+  cleaning: 'נייר טואלט, מגבות נייר, נוזל כלים, טבליות למדיח, אבקת כביסה, מרכך כביסה, אקונומיקה, נוזל רצפות, שקיות זבל, ספוגים, סבון ידיים, שמפו, מרכך שיער, משחת שיניים, דאודורנט, מגבונים, נייר כסף, ניילון נצמד',
+  other: 'סוללות, שקיות הקפאה, מזון לחיות מחמד'
+};
+
+/* the household's regular list: a big list you trim over time */
+function favs() { return all('fav'); }
+function buyCounts() {
+  var buys = all('buy'), trips = {}, counts = {};
+  buys.forEach(function (b) { if (b.date) trips[b.date] = 1; });
+  favs().forEach(function (f) { counts[f.id] = buys.filter(function (b) { return similar(b.name, f.name); }).length; });
+  return { counts: counts, trips: Object.keys(trips).length };
+}
+function seedStarter() {
+  var have = favs(), t = Date.now(), i = 0, added = [];
+  bulk(function () { Object.keys(STARTER).forEach(function (cat) {
+    STARTER[cat].split(', ').forEach(function (name) {
+      if (have.some(function (f) { return similar(f.name, name); })) return;
+      var id = rid(); added.push(id); put('fav', id, { name: name, cat: cat, added: t + i++ });
+    });
+  }); });
+  return added.length;
+}
+function ensureFav(name, cat) {
+  if (favs().some(function (f) { return similar(f.name, name); })) return;
+  put('fav', rid(), { name: name.trim().slice(0, 80), cat: CATS[cat] ? cat : guessCat(name), added: Date.now() });
+}
+function renderFavEntry() {
+  var n = favs().length, box = $('favEntry');
+  if (!n) {
+    box.replaceChildren(h('div', { class: 'card' },
+      h('b', null, 'להתחיל מרשימה מוכנה?'),
+      h('p', { class: 'note' }, 'כ־' + 120 + ' מוצרים נפוצים בבית ישראלי, לפי מחלקות. בכל קנייה מסמנים מה צריך, ומוחקים מה שאתם לא קונים. אחרי כמה קניות היא תתאים לכם בדיוק.'),
+      h('div', { class: 'bar' }, h('button', { type: 'button', class: 'primary', onclick: function () { var k = seedStarter(); toast(k + ' מוצרים נוספו לרשימה הקבועה'); openFavs(); } }, 'צור לי רשימה קבועה'))));
+    return;
+  }
+  box.replaceChildren(h('button', { type: 'button', class: 'primary', style: 'width:100%', onclick: openFavs }, 'בחירה מהרשימה הקבועה (' + n + ')'));
+}
+function openFavs() { $('favQ').value = ''; renderFavs(); $('favs').showModal(); }
+$('favClose').addEventListener('click', function () { $('favs').close(); });
+$('favQ').addEventListener('input', function () { renderFavs(); });
+$('favAdd').addEventListener('submit', function (e) {
+  e.preventDefault(); var v = $('favName').value.trim(); if (!v) return;
+  var p = parseQty(v); ensureFav(p.name); addToList(p.name, p.qty); $('favName').value = ''; renderFavs();
+  toast(p.name + ' נוסף לרשימה הקבועה ולקניות');
+});
+function renderFavs() {
+  var q = norm($('favQ').value), bc = buyCounts(), list = all('list').filter(function (l) { return !l.done; });
+  var inList = function (f) { return list.filter(function (l) { return similar(l.name, f.name); })[0]; };
+  var rows = [], shown = favs().filter(function (f) { return !q || norm(f.name).indexOf(q) >= 0; });
+  Object.keys(CATS).forEach(function (c) {
+    var g = shown.filter(function (f) { return (CATS[f.cat] ? f.cat : 'other') === c; })
+      .sort(function (a, b) { return (bc.counts[b.id] - bc.counts[a.id]) || (a.added || 0) - (b.added || 0); });
+    if (!g.length) return;
+    rows.push(h('div', { class: 'group' }, CATS[c].he));
+    g.forEach(function (f) {
+      var l = inList(f), n = bc.counts[f.id];
+      rows.push(h('label', { class: 'row' + (l ? ' need' : '') },
+        h('input', { type: 'checkbox', class: 'check', checked: !!l, 'aria-label': 'צריך: ' + f.name, onchange: function (e) {
+          if (e.target.checked) addToList(f.name, 1); else { var x = inList(f); if (x) put('list', x.id, null); }
+          renderFavs();
+        } }),
+        h('span', { class: 'main name' }, f.name),
+        h('span', { class: 'cnt' }, n ? 'נקנה ' + n + (n === 1 ? ' פעם' : ' פעמים') : bc.trips >= 3 ? 'עוד לא נקנה' : ''),
+        h('button', { type: 'button', class: 'x', 'aria-label': 'מחיקה מהרשימה הקבועה: ' + f.name, onclick: function (e) { e.preventDefault(); var u = snap([['fav', f.id]]); put('fav', f.id, null); renderFavs(); toast(f.name + ' נמחק מהרשימה הקבועה', function () { u(); renderFavs(); }); } }, '✕')));
+    });
+  });
+  $('favRows').replaceChildren(rows.length ? h('div', { class: 'rows' }, rows) : h('p', { class: 'empty' }, q ? 'לא נמצא. אפשר להוסיף אותו בשורה למעלה.' : 'הרשימה הקבועה ריקה.'));
+  var never = favs().filter(function (f) { return !bc.counts[f.id] && !inList(f); });
+  $('favPrune').replaceChildren(bc.trips >= 5 && never.length ? h('div', { class: 'card' },
+    h('p', { class: 'note' }, never.length + ' מוצרים לא נקנו באף אחת מ־' + bc.trips + ' הקניות האחרונות.'),
+    h('button', { type: 'button', onclick: function () {
+      ask('לנקות את הרשימה הקבועה?', 'יימחקו: ' + never.map(function (f) { return f.name; }).slice(0, 25).join(', ') + (never.length > 25 ? ' ועוד ' + (never.length - 25) : '') + '.', 'מחק ' + never.length, function () {
+        var u = snap(never.map(function (f) { return ['fav', f.id]; })); bulk(function () { never.forEach(function (f) { put('fav', f.id, null); }); });
+        renderFavs(); toast(never.length + ' מוצרים נמחקו', function () { u(); renderFavs(); });
+      });
+    } }, 'מחק את מה שלא קונים')) : null);
+}
 
 /* list */
 function renderSuggest() {
@@ -664,6 +772,7 @@ $('finish').addEventListener('click', function () {
     if (it) { var fresh = newItem(it.name, l.qty, { cat: it.cat, loc: it.loc }); put('item', it.id, Object.assign(strip(it), { qty: l.qty || 1, exp: fresh.exp, est: fresh.est, opened: false })); }
     else put('item', rid(), newItem(l.name, l.qty || 1, { cat: l.cat }));
     put('buy', rid(), { name: l.name, cat: l.cat, qty: l.qty || 1, price: null, store: '', date: day });
+    if (favs().length) ensureFav(l.name, l.cat);
     put('list', l.id, null);
   });
   toast(done.length + ' מוצרים עברו למלאי');

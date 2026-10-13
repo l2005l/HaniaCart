@@ -55,6 +55,7 @@ test('rows are cleaned to their shape', () => {
   assert.deepEqual(Object.keys(it).sort(), ['added', 'by', 'cat', 'est', 'exp', 'loc', 'minq', 'name', 'opened', 'price', 'qty', 'staple']);
   assert.equal(it.name, 'גבינה'); assert.equal(it.qty, 999); assert.equal(it.cat, 'other'); assert.equal(it.loc, 'pantry'); assert.equal(it.exp, null); assert.equal(it.price, null);
   assert.equal(clean('list', { name: '' }), null);
+  assert.deepEqual(clean('fav', { name: 'טחינה', cat: 'dry', added: 5, junk: 1 }), { name: 'טחינה', cat: 'dry', added: 5 });
   assert.equal(clean('plan', { meals: [{ dish: 'שקשוקה', uses: ['ביצים'], missing: [] }, { dish: '' }] }).meals.length, 1);
 });
 

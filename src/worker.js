@@ -5,7 +5,7 @@ import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
 
 export const CATS = ['produce', 'bread', 'dairy', 'eggs', 'meat', 'frozen', 'dry', 'drinks', 'cleaning', 'other'];
 export const LOCS = ['fridge', 'freezer', 'pantry', 'other'];
-const KINDS = ['item', 'list', 'receipt', 'buy', 'waste', 'plan'];
+const KINDS = ['item', 'list', 'receipt', 'buy', 'waste', 'plan', 'fav'];
 const TEXT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const VISION_MODEL = '@cf/meta/llama-4-scout-17b-16e-instruct';
 const DAY = 864e5;
@@ -59,6 +59,9 @@ export function clean(kind, d) {
     case 'waste':
       if (!name) return null;
       return { name, cat, qty: int(d.qty, 1, 999, 1), price: money(d.price) || 0, at: int(d.at, 0, 1e13, 0), by };
+    case 'fav':
+      if (!name) return null;
+      return { name, cat, added };
     case 'plan':
       return { created: int(d.created, 0, 1e13, 0), people: int(d.people, 1, 20, 2), prefs: str(d.prefs, 200),
         meals: (Array.isArray(d.meals) ? d.meals.slice(0, 7) : []).map((m) => (m && typeof m === 'object' ? { dish: str(m.dish, 80), uses: strs(m.uses, 12, 40), missing: strs(m.missing, 12, 40), how: str(m.how, 500), done: !!m.done } : null)).filter((m) => m && m.dish) };
