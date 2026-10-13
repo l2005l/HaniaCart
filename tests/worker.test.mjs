@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { dueText, ilNow } from '../src/push.js';
-import worker, { clean, cleanScan, scanPrompt, mealPrompt, looseJson, runReminders, cleanup } from '../src/worker.js';
+import worker, { gtin14, clean, cleanScan, scanPrompt, mealPrompt, looseJson, runReminders, cleanup } from '../src/worker.js';
 
 function fakeD1() {
   const db = new DatabaseSync(':memory:');
@@ -55,7 +55,7 @@ test('rows are cleaned to their shape', () => {
   assert.deepEqual(Object.keys(it).sort(), ['added', 'by', 'cat', 'est', 'exp', 'loc', 'minq', 'name', 'opened', 'price', 'qty', 'staple']);
   assert.equal(it.name, 'גבינה'); assert.equal(it.qty, 999); assert.equal(it.cat, 'other'); assert.equal(it.loc, 'pantry'); assert.equal(it.exp, null); assert.equal(it.price, null);
   assert.equal(clean('list', { name: '' }), null);
-  assert.deepEqual(clean('fav', { name: 'טחינה', cat: 'dry', added: 5, junk: 1 }), { name: 'טחינה', cat: 'dry', added: 5, photo: '', desc: '' });
+  assert.deepEqual(clean('fav', { name: 'טחינה', cat: 'dry', added: 5, junk: 1 }), { name: 'טחינה', cat: 'dry', added: 5, photo: '', desc: '', code: '' });
   assert.equal(clean('plan', { meals: [{ dish: 'שקשוקה', uses: ['ביצים'], missing: [] }, { dish: '' }] }).meals.length, 1);
 });
 
@@ -142,6 +142,21 @@ test('a product photo is stored, described, served and replaced', async () => {
   assert.equal((await call(env, 'GET', '/api/photo/' + HH + '/' + r.id)).status, 404, 'the replaced photo is gone');
   assert.equal(r2.desc, '');
   assert.deepEqual(clean('fav', { name: 'קמח', photo: r2.id, desc: 'x' }).photo, r2.id);
+});
+
+test('prices are found by barcode and by name words', async () => {
+  const env = { DB: fakeD1() };
+  const ins = env.DB.raw.prepare('INSERT INTO prices (chain,code,store,name,price,unit,promo,pprice,ts) VALUES (?,?,?,?,?,?,?,?,?)');
+  ins.run('רמי לוי', '07290000000017', 'פארק נועם', 'קמח כוסמין 80% זהב 1 ק"ג', 14.9, '', '', null, 1);
+  ins.run('ויקטורי', '07290000000017', 'נתיבות', 'קמח כוסמין זהב', 16.5, '', '2 ב-30', 15, 1);
+  ins.run('ויקטורי', '07290000000024', 'נתיבות', 'קמח לבן', 4.9, '', '', null, 1);
+  assert.equal(gtin14('7290000000017'), '07290000000017'); assert.equal(gtin14('abc'), '');
+  const r = await (await call(env, 'GET', '/api/prices?codes=7290000000017,1', { hh: HH })).json();
+  assert.deepEqual(r.prices['07290000000017'].map((x) => x.chain), ['רמי לוי', 'ויקטורי']);
+  const s = await (await call(env, 'GET', '/api/prices/search?q=' + encodeURIComponent('כוסמין קמח'), { hh: HH })).json();
+  assert.equal(s.results.length, 1); assert.equal(s.results[0].chains, 2); assert.equal(s.results[0].min, 14.9);
+  assert.equal((await call(env, 'GET', '/api/prices?codes=1')).status, 400, 'needs a household');
+  assert.equal(clean('fav', { name: 'קמח', code: '7290000000017' }).code, '07290000000017');
 });
 
 test('looseJson finds the object inside prose', () => {

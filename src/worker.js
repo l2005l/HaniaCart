@@ -18,6 +18,8 @@ const int = (v, lo, hi, d) => { const n = Math.round(+v); return Number.isFinite
 const money = (v) => { const n = +v; return Number.isFinite(n) && n > 0 && n < 100000 ? Math.round(n * 100) / 100 : null; };
 const strs = (a, n, len) => (Array.isArray(a) ? a.slice(0, n).map((x) => str(x, len)).filter(Boolean) : []);
 export const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s + 'T00:00:00Z'));
+// Barcodes are compared as GTIN-14: EAN-13 / UPC-12 / EAN-8 padded with zeros. '' when it is not a barcode.
+export function gtin14(v) { const d = String(v == null ? '' : v).replace(/\D/g, ''); return d.length >= 8 && d.length <= 14 ? d.padStart(14, '0') : ''; }
 const okId = (s) => typeof s === 'string' && /^[A-Za-z0-9_-]{4,40}$/.test(s);
 
 export function hhKey(req) { const t = req.headers.get('x-hh') || ''; return /^[A-Za-z0-9_-]{24,48}$/.test(t) ? t : ''; }
@@ -61,7 +63,7 @@ export function clean(kind, d) {
       return { name, cat, qty: int(d.qty, 1, 999, 1), price: money(d.price) || 0, at: int(d.at, 0, 1e13, 0), by };
     case 'fav':
       if (!name) return null;
-      return { name, cat, added, photo: okId(d.photo) ? d.photo : '', desc: str(d.desc, 120) };
+      return { name, cat, added, photo: okId(d.photo) ? d.photo : '', desc: str(d.desc, 120), code: gtin14(d.code) };
     case 'plan':
       return { created: int(d.created, 0, 1e13, 0), people: int(d.people, 1, 20, 2), prefs: str(d.prefs, 200),
         meals: (Array.isArray(d.meals) ? d.meals.slice(0, 7) : []).map((m) => (m && typeof m === 'object' ? { dish: str(m.dish, 80), uses: strs(m.uses, 12, 40), missing: strs(m.missing, 12, 40), how: str(m.how, 500), done: !!m.done } : null)).filter((m) => m && m.dish) };
@@ -221,6 +223,35 @@ async function delPhoto(req, env) {
   return json({ ok: true });
 }
 
+/* ---- chain prices ---- */
+const priceRow = (r) => ({ chain: r.chain, store: r.store, name: r.name, price: r.price, unit: r.unit, promo: r.promo, pprice: r.pprice, ts: r.ts });
+async function getPrices(req, env, url) {
+  if (!hhKey(req)) return bad('household');
+  const codes = [...new Set(String(url.searchParams.get('codes') || '').split(',').map(gtin14).filter(Boolean))].slice(0, 200);
+  const out = {};
+  for (let i = 0; i < codes.length; i += 50) {
+    const part = codes.slice(i, i + 50);
+    const { results } = await env.DB.prepare('SELECT * FROM prices WHERE code IN (' + part.map(() => '?').join(',') + ')').bind(...part).all();
+    for (const r of results) (out[r.code] = out[r.code] || []).push(priceRow(r));
+  }
+  for (const k in out) out[k].sort((a, b) => (a.pprice || a.price) - (b.pprice || b.price));
+  return json({ prices: out });
+}
+// Products whose name holds every word typed, one row per barcode, cheapest first.
+async function searchPrices(req, env, url) {
+  if (!hhKey(req)) return bad('household');
+  const words = str(url.searchParams.get('q'), 60).split(/\s+/).filter((w) => w.length > 1).slice(0, 5);
+  if (!words.length) return json({ results: [] });
+  const { results } = await env.DB.prepare('SELECT code, name, MIN(price) AS min, COUNT(*) AS chains FROM prices WHERE ' + words.map(() => 'name LIKE ?').join(' AND ') + ' GROUP BY code ORDER BY chains DESC, min ASC LIMIT 25')
+    .bind(...words.map((w) => '%' + w + '%')).all();
+  return json({ results: results.map((r) => ({ code: r.code, name: r.name, min: r.min, chains: r.chains })) });
+}
+async function priceStatus(req, env) {
+  const row = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:status'").first();
+  const count = await env.DB.prepare('SELECT chain, COUNT(*) AS n, MAX(ts) AS ts FROM prices GROUP BY chain').all();
+  return json({ status: row ? JSON.parse(row.v) : null, chains: count.results });
+}
+
 async function postMeals(req, env) {
   const hh = hhKey(req); if (!hh) return bad('household');
   const b = await req.json().catch(() => null); if (!b) return bad('json');
@@ -290,6 +321,9 @@ const ROUTES = {
   'POST /api/sync': postSync,
   'POST /api/scan': postScan,
   'POST /api/meals': postMeals,
+  'GET /api/prices': getPrices,
+  'GET /api/prices/search': searchPrices,
+  'GET /api/prices/status': priceStatus,
   'POST /api/photo': postPhoto,
   'POST /api/photo/delete': delPhoto,
   'GET /api/push/key': pushKey,
