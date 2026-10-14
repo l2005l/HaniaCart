@@ -261,10 +261,10 @@ test('a household that is cleaned up also leaves the accounts', async () => {
   assert.equal(env.DB.raw.prepare('SELECT COUNT(*) n FROM account_hh').get().n, 0);
 });
 
-test('staging talks to Hania Pass staging; production has no binding until Hania Pass is live', () => {
+test('production talks to Hania Pass; staging to Hania Pass staging', () => {
   const cfg = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   const parsed = JSON.parse(cfg.replace(/^\s*\/\/.*$/gm, ''));
-  assert.equal(parsed.services, undefined);
+  assert.deepEqual(parsed.services, [{ binding: 'PASS', service: 'hania-pass' }]);
   assert.deepEqual(parsed.env.staging.services, [{ binding: 'PASS', service: 'hania-pass-staging' }]);
   assert.equal(parsed.env.staging.d1_databases[0].database_name, 'haniacart-staging');
   assert.deepEqual(parsed.env.staging.triggers.crons, []);
