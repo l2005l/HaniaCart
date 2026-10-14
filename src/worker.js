@@ -1,7 +1,7 @@
 import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
 import { gtin14 } from './gtin.js';
 import { refreshLaib } from './laib.js';
-import { getAccount, linkAccount, unlinkAccount } from './account.js';
+import { getAccount, linkAccount, unlinkAccount, accountSummary, summaryPreflight } from './account.js';
 export { gtin14 };
 // HaniaCart API. A household is a long random key both phones keep (sent as x-hh). Accounts are optional:
 // a Hania360 (Hania Pass) account can keep the household key for a new phone (src/account.js).
@@ -356,6 +356,8 @@ const ROUTES = {
   'GET /api/account': getAccount,
   'POST /api/account/link': linkAccount,
   'POST /api/account/unlink': unlinkAccount,
+  'GET /api/account/summary': accountSummary,
+  'OPTIONS /api/account/summary': summaryPreflight,
   'GET /api/sync': getSync,
   'POST /api/sync': postSync,
   'POST /api/scan': postScan,
