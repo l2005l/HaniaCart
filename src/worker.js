@@ -1,8 +1,10 @@
 import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
 import { gtin14 } from './gtin.js';
 import { refreshLaib } from './laib.js';
+import { getAccount, linkAccount, unlinkAccount } from './account.js';
 export { gtin14 };
-// HaniaCart API. A household is a long random key both phones keep (sent as x-hh); there are no accounts.
+// HaniaCart API. A household is a long random key both phones keep (sent as x-hh). Accounts are optional:
+// a Hania360 (Hania Pass) account can keep the household key for a new phone (src/account.js).
 // Every row the household keeps is stored as JSON and synced by "what changed since".
 // Image and meal features use Claude when ANTHROPIC_KEY is set, otherwise Workers AI.
 
@@ -346,11 +348,14 @@ export async function cleanup(env, now = Date.now()) {
   await env.DB.prepare('DELETE FROM rows WHERE del=1 AND upd<?').bind(now - 60 * DAY).run();
   await env.DB.prepare("DELETE FROM rows WHERE kind='buy' AND upd<?").bind(now - 730 * DAY).run();
   const old = (await env.DB.prepare('SELECT id FROM hh WHERE seen<?').bind(now - 400 * DAY).all()).results;
-  for (const h of old) { await env.DB.prepare('DELETE FROM rows WHERE hh=?').bind(h.id).run(); await env.DB.prepare('DELETE FROM photos WHERE hh=?').bind(h.id).run(); await env.DB.prepare('DELETE FROM hh WHERE id=?').bind(h.id).run(); }
+  for (const h of old) { await env.DB.prepare('DELETE FROM rows WHERE hh=?').bind(h.id).run(); await env.DB.prepare('DELETE FROM photos WHERE hh=?').bind(h.id).run(); await env.DB.prepare('DELETE FROM account_hh WHERE hh=?').bind(h.id).run(); await env.DB.prepare('DELETE FROM hh WHERE id=?').bind(h.id).run(); }
   await env.DB.prepare('DELETE FROM counters WHERE k NOT LIKE ? AND k NOT LIKE ?').bind('%' + ilNow(now).day, '%' + ilNow(now - DAY).day).run();
 }
 
 const ROUTES = {
+  'GET /api/account': getAccount,
+  'POST /api/account/link': linkAccount,
+  'POST /api/account/unlink': unlinkAccount,
   'GET /api/sync': getSync,
   'POST /api/sync': postSync,
   'POST /api/scan': postScan,

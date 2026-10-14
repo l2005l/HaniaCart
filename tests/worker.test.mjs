@@ -194,3 +194,78 @@ test('looseJson finds the object inside prose', () => {
   assert.deepEqual(looseJson('הנה: {"a":1} תודה'), { a: 1 });
   assert.equal(looseJson('nothing'), null);
 });
+
+/* ---- optional Hania360 account (Hania Pass) ---- */
+const CART = 'https://cart.test';
+const fakePass = (user) => ({
+  calls: 0,
+  async fetch(url, init) {
+    this.calls++;
+    const cookie = (init && init.headers && init.headers.cookie) || '';
+    const ok = user && cookie.includes('hp_session=good');
+    return new Response(JSON.stringify(ok ? { signedIn: true, user } : { signedIn: false }), { headers: { 'content-type': 'application/json' } });
+  },
+});
+const acc = (env, method, path, { hh, cookie, origin } = {}) => {
+  const headers = {}; if (hh) headers['x-hh'] = hh; if (cookie) headers.cookie = cookie; if (origin) headers.origin = origin;
+  if (method === 'POST') headers['content-type'] = 'application/json';
+  return worker.fetch(new Request(CART + path, { method, headers, body: method === 'POST' ? '{}' : undefined }), env);
+};
+const LIOR = { id: 'user-lior', email: 'lior@example.com' };
+
+test('without Hania Pass the account feature is simply off', async () => {
+  const env = { DB: fakeD1() };
+  assert.deepEqual(await (await acc(env, 'GET', '/api/account', { hh: HH })).json(), { available: false });
+  assert.equal((await acc(env, 'POST', '/api/account/link', { hh: HH, cookie: 'hp_session=good', origin: CART })).status, 404);
+});
+
+test('signed out: available but nothing to show, and Hania Pass is not even asked without a cookie', async () => {
+  const PASS = fakePass(LIOR), env = { DB: fakeD1(), PASS };
+  assert.deepEqual(await (await acc(env, 'GET', '/api/account', { hh: HH })).json(), { available: true, signedIn: false });
+  assert.equal(PASS.calls, 0);
+  assert.equal((await acc(env, 'POST', '/api/account/link', { hh: HH, cookie: 'hp_session=bad', origin: CART })).status, 401);
+});
+
+test('a signed-in person saves the household and gets it back on a new phone', async () => {
+  const env = { DB: fakeD1(), PASS: fakePass(LIOR) }, cookie = 'hp_session=good';
+  assert.equal((await acc(env, 'POST', '/api/account/link', { hh: HH, cookie, origin: CART })).status, 200);
+  assert.equal((await acc(env, 'POST', '/api/account/link', { hh: HH, cookie, origin: CART })).status, 200, 'linking twice is fine');
+  const here = await (await acc(env, 'GET', '/api/account', { hh: HH, cookie })).json();
+  assert.equal(here.linked, true); assert.equal(here.email, 'lior@example.com'); assert.deepEqual(here.households, [HH]);
+  // A new phone has its own fresh key; the account offers the saved one.
+  const fresh = await (await acc(env, 'GET', '/api/account', { hh: HH2, cookie })).json();
+  assert.equal(fresh.linked, false); assert.deepEqual(fresh.households, [HH]);
+  assert.equal((await acc(env, 'POST', '/api/account/unlink', { hh: HH, cookie, origin: CART })).status, 200);
+  assert.deepEqual((await (await acc(env, 'GET', '/api/account', { hh: HH, cookie })).json()).households, []);
+});
+
+test('another person never sees your households', async () => {
+  const db = fakeD1();
+  await acc({ DB: db, PASS: fakePass(LIOR) }, 'POST', '/api/account/link', { hh: HH, cookie: 'hp_session=good', origin: CART });
+  const other = await (await acc({ DB: db, PASS: fakePass({ id: 'user-other', email: 'o@example.com' }) }, 'GET', '/api/account', { hh: HH2, cookie: 'hp_session=good' })).json();
+  assert.deepEqual(other.households, []);
+});
+
+test('changes need HaniaCart\'s own page and a household key', async () => {
+  const env = { DB: fakeD1(), PASS: fakePass(LIOR) }, cookie = 'hp_session=good';
+  assert.equal((await acc(env, 'POST', '/api/account/link', { hh: HH, cookie, origin: 'https://evil.example' })).status, 403);
+  assert.equal((await acc(env, 'POST', '/api/account/link', { hh: HH, cookie })).status, 403);
+  assert.equal((await acc(env, 'POST', '/api/account/link', { cookie, origin: CART })).status, 400);
+});
+
+test('a household that is cleaned up also leaves the accounts', async () => {
+  const env = { DB: fakeD1(), PASS: fakePass(LIOR) };
+  await acc(env, 'POST', '/api/account/link', { hh: HH, cookie: 'hp_session=good', origin: CART });
+  env.DB.raw.prepare('INSERT INTO hh (id,created,seen) VALUES (?,?,?)').run(HH, 0, 0);
+  await cleanup(env, Date.now());
+  assert.equal(env.DB.raw.prepare('SELECT COUNT(*) n FROM account_hh').get().n, 0);
+});
+
+test('production talks to Hania Pass; staging to Hania Pass staging', () => {
+  const cfg = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  const parsed = JSON.parse(cfg.replace(/^\s*\/\/.*$/gm, ''));
+  assert.deepEqual(parsed.services, [{ binding: 'PASS', service: 'hania-pass' }]);
+  assert.deepEqual(parsed.env.staging.services, [{ binding: 'PASS', service: 'hania-pass-staging' }]);
+  assert.equal(parsed.env.staging.d1_databases[0].database_name, 'haniacart-staging');
+  assert.deepEqual(parsed.env.staging.triggers.crons, []);
+});
