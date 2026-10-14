@@ -269,3 +269,51 @@ test('production talks to Hania Pass; staging to Hania Pass staging', () => {
   assert.equal(parsed.env.staging.d1_databases[0].database_name, 'haniacart-staging');
   assert.deepEqual(parsed.env.staging.triggers.crons, []);
 });
+
+/* ---- Hania Today summary ---- */
+import { summarize, summaryCors } from '../src/account.js';
+
+test('the summary lists what expires soon, what ran out, and the open list, never the key', async () => {
+  const env = { DB: fakeD1(), PASS: fakePass(LIOR) }, cookie = 'hp_session=good';
+  const today = new Date().toISOString().slice(0, 10), far = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  await put(env, HH, [
+    { kind: 'item', id: 'milk1', data: { name: 'חלב', qty: 1, exp: today } },
+    { kind: 'item', id: 'rice1', data: { name: 'אורז', qty: 2, exp: far } },
+    { kind: 'item', id: 'eggs1', data: { name: 'ביצים', qty: 0, staple: true, minq: 1 } },
+    { kind: 'list', id: 'list1', data: { name: 'לחם', qty: 1 } },
+    { kind: 'list', id: 'list2', data: { name: 'גבינה', qty: 1, done: true } },
+  ]);
+  await acc(env, 'POST', '/api/account/link', { hh: HH, cookie, origin: CART });
+  const res = await worker.fetch(new Request(CART + '/api/account/summary', { headers: { cookie, origin: 'https://pass.hania360.com' } }), env);
+  assert.equal(res.headers.get('access-control-allow-origin'), 'https://pass.hania360.com');
+  assert.equal(res.headers.get('access-control-allow-credentials'), 'true');
+  const body = await res.json(), text = JSON.stringify(body);
+  assert.equal(body.homes.length, 1);
+  assert.deepEqual(body.homes[0].expiring.map((e) => e.name), ['חלב']);
+  assert.deepEqual(body.homes[0].out, ['ביצים']);
+  assert.equal(body.homes[0].listOpen, 1);
+  assert.ok(!text.includes(HH), 'the household key never leaves');
+});
+
+test('the summary is only readable by Hania360 sites, and signed out shows nothing', async () => {
+  assert.equal(summaryCors('https://evil.example'), null);
+  assert.equal(summaryCors('http://pass.hania360.com'), null);
+  assert.ok(summaryCors('https://hania-pass-staging.lior-hania.workers.dev'));
+  const env = { DB: fakeD1(), PASS: fakePass(LIOR) };
+  const res = await worker.fetch(new Request(CART + '/api/account/summary', { headers: { origin: 'https://evil.example', cookie: 'hp_session=good' } }), env);
+  assert.equal(res.headers.get('access-control-allow-origin'), null);
+  const out = await (await worker.fetch(new Request(CART + '/api/account/summary'), env)).json();
+  assert.deepEqual(out, { available: true, signedIn: false });
+});
+
+test('summarize ignores items without dates and far-off dates', () => {
+  const now = Date.parse('2026-10-14T09:00:00Z');
+  const s = summarize([
+    { kind: 'item', data: JSON.stringify({ name: 'a', qty: 1 }) },
+    { kind: 'item', data: JSON.stringify({ name: 'b', qty: 1, exp: '2026-10-13' }) },
+    { kind: 'item', data: JSON.stringify({ name: 'c', qty: 1, exp: '2026-10-17' }) },
+    { kind: 'item', data: JSON.stringify({ name: 'd', qty: 1, exp: '2026-10-18' }) },
+    { kind: 'item', data: 'not json' },
+  ], now);
+  assert.deepEqual(s.expiring, [{ name: 'b', exp: '2026-10-13', past: true }, { name: 'c', exp: '2026-10-17', past: false }]);
+});

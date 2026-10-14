@@ -64,3 +64,54 @@ export async function unlinkAccount(req, env) {
   await env.DB.prepare('DELETE FROM account_hh WHERE user_id=? AND hh=?').bind(user.id, hh).run();
   return json({ ok: true, linked: false });
 }
+
+/* ---- Hania Today: a short summary of the households saved in the account ---- */
+// Read by the Hania Today page (Hania Pass) from the browser, with the shared cookie.
+// Never returns household keys: a key is the household itself.
+
+const DAY = 864e5;
+const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
+
+/** Only https Hania360 sites (and the staging workers.dev sites) may read the summary. */
+export function summaryCors(origin) {
+  if (!origin) return null;
+  let u; try { u = new URL(origin); } catch { return null; }
+  if (u.protocol !== 'https:') return null;
+  const h = u.hostname;
+  const ok = h === 'hania360.com' || h.endsWith('.hania360.com') || h.endsWith('.lior-hania.workers.dev');
+  return ok ? { 'access-control-allow-origin': u.origin, 'access-control-allow-credentials': 'true', vary: 'Origin' } : null;
+}
+
+export function summarize(rows, now = Date.now()) {
+  const today = isoDay(now), soon = isoDay(now + 3 * DAY);
+  const expiring = [], out = []; let listOpen = 0;
+  for (const r of rows) {
+    let d; try { d = JSON.parse(r.data); } catch { continue; }
+    if (r.kind === 'list' && !d.done) listOpen++;
+    if (r.kind !== 'item') continue;
+    if (d.staple && (d.qty || 0) <= 0) { out.push(d.name); continue; }
+    if (d.exp && d.exp <= soon && (d.qty || 0) > 0) expiring.push({ name: d.name, exp: d.exp, past: d.exp < today });
+  }
+  expiring.sort((a, b) => (a.exp < b.exp ? -1 : a.exp > b.exp ? 1 : 0));
+  return { expiring: expiring.slice(0, 8), expiringCount: expiring.length, out: out.slice(0, 8), outCount: out.length, listOpen };
+}
+
+export async function accountSummary(req, env) {
+  const cors = summaryCors(req.headers.get('origin'));
+  const reply = (body, status = 200) => { const r = json(body, status); if (cors) for (const [k, v] of Object.entries(cors)) r.headers.set(k, v); return r; };
+  const user = await passUser(req, env);
+  if (user === undefined) return reply({ available: false });
+  if (!user) return reply({ available: true, signedIn: false });
+  const keys = await households(env, user.id);
+  const homes = [];
+  for (const hh of keys) {
+    const rows = (await env.DB.prepare("SELECT kind,data FROM rows WHERE hh=? AND del=0 AND kind IN ('item','list')").bind(hh).all()).results;
+    homes.push(summarize(rows));
+  }
+  return reply({ available: true, signedIn: true, homes });
+}
+
+export function summaryPreflight(req) {
+  const cors = summaryCors(req.headers.get('origin'));
+  return new Response(null, { status: 204, headers: cors ? { ...cors, 'access-control-allow-methods': 'GET', 'access-control-max-age': '600' } : {} });
+}
