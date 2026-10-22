@@ -386,6 +386,13 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS ? env.ASSETS.fetch(req) : new Response('Not found', { status: 404 });
+    // The API is not for search engines (robots.txt also says so).
+    const res = await this.api(req, env, url);
+    const out = new Response(res.body, res);
+    out.headers.set('x-robots-tag', 'noindex, nofollow');
+    return out;
+  },
+  async api(req, env, url) {
     if (url.pathname === '/api/health') return json({ ok: true, ai: !!env.AI, claude: !!env.ANTHROPIC_KEY });
     if (req.method === 'GET' && url.pathname.startsWith('/api/photo/')) return getPhoto(req, env, url);
     const h = ROUTES[req.method + ' ' + url.pathname];
