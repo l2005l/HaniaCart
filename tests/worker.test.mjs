@@ -317,3 +317,18 @@ test('summarize ignores items without dates and far-off dates', () => {
   ], now);
   assert.deepEqual(s.expiring, [{ name: 'b', exp: '2026-10-13', past: true }, { name: 'c', exp: '2026-10-17', past: false }]);
 });
+
+test('Hania Today adds to the shopping list of the saved household, once per name', async () => {
+  const env = { DB: fakeD1(), PASS: fakePass(LIOR) }, cookie = 'hp_session=good';
+  await put(env, HH, [{ kind: 'list', id: 'list1', data: { name: 'חלב', qty: 1 } }]);
+  await acc(env, 'POST', '/api/account/link', { hh: HH, cookie, origin: CART });
+  const add = (items, origin = 'https://today.hania360.com', c = cookie) => worker.fetch(new Request(CART + '/api/account/list', { method: 'POST', headers: { cookie: c, origin, 'content-type': 'application/json' }, body: JSON.stringify({ items }) }), env);
+  const r = await add(['חלב', 'ביצים', ' ביצים ', 'לחם']);
+  assert.equal(r.headers.get('access-control-allow-origin'), 'https://today.hania360.com');
+  assert.deepEqual(await r.json(), { ok: true, added: 2, skipped: 2 });
+  const sync = await (await call(env, 'GET', '/api/sync?since=0', { hh: HH })).json();
+  const names = sync.rows.filter((x) => x.kind === 'list').map((x) => x.data.name).sort();
+  assert.deepEqual(names, ['ביצים', 'חלב', 'לחם']);
+  assert.equal((await add(['x'], 'https://evil.example')).status, 403);
+  assert.equal((await add(['x'], 'https://today.hania360.com', '')).status, 401);
+});

@@ -5,7 +5,7 @@
 // Who is signed in is asked of Hania Pass itself, over a Service Binding (env.PASS),
 // with the browser's own cookie. With no binding the feature is simply off.
 
-import { hhKey } from './worker.js';
+import { hhKey, clean } from './worker.js';
 
 const MAX_HOUSEHOLDS = 10;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -114,4 +114,45 @@ export async function accountSummary(req, env) {
 export function summaryPreflight(req) {
   const cors = summaryCors(req.headers.get('origin'));
   return new Response(null, { status: 204, headers: cors ? { ...cors, 'access-control-allow-methods': 'GET', 'access-control-max-age': '600' } : {} });
+}
+
+/* ---- Hania Today: quick add to the shopping list ---- */
+// Hania Today (another Hania360 site) adds items to the list of the first household saved in
+// the account, with the shared cookie. Only Hania360 sites may ask (CORS + JSON preflight).
+
+export async function accountListAdd(req, env) {
+  const cors = summaryCors(req.headers.get('origin'));
+  const reply = (body, status = 200) => { const r = json(body, status); if (cors) for (const [k, v] of Object.entries(cors)) r.headers.set(k, v); return r; };
+  if (!cors) return reply({ error: 'origin' }, 403);
+  if (!/^application\/json/.test(req.headers.get('content-type') || '')) return reply({ error: 'json' }, 415);
+  const user = await passUser(req, env);
+  if (user === undefined) return reply({ error: 'unavailable' }, 404);
+  if (!user) return reply({ error: 'signed_out' }, 401);
+  const body = await req.json().catch(() => ({}));
+  const names = (Array.isArray(body.items) ? body.items : []).map((x) => String(x || '').replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, 20);
+  if (!names.length) return reply({ error: 'items' }, 400);
+  const keys = await households(env, user.id);
+  const hh = keys[Math.max(0, Math.min(keys.length - 1, Number(body.home) || 0))];
+  if (!hh) return reply({ error: 'no_home' }, 409);
+  const open = new Set((await env.DB.prepare("SELECT data FROM rows WHERE hh=? AND kind='list' AND del=0").bind(hh).all()).results
+    .map((r) => { try { const d = JSON.parse(r.data); return d.done ? '' : String(d.name || '').trim().toLowerCase(); } catch { return ''; } }).filter(Boolean));
+  const now = Date.now(), by = String(body.by || 'Hania Today').slice(0, 30), stmts = [];
+  let added = 0;
+  for (const name of names) {
+    if (open.has(name.toLowerCase())) continue;
+    open.add(name.toLowerCase());
+    const c = clean('list', { name, qty: 1, cat: 'other', done: false, by, added: now });
+    if (!c) continue;
+    const id = 't' + crypto.randomUUID().replace(/-/g, '').slice(0, 15);
+    stmts.push(env.DB.prepare('INSERT INTO rows (hh,kind,id,data,upd,del) VALUES (?,?,?,?,?,0)').bind(hh, 'list', id, JSON.stringify(c), now));
+    added++;
+  }
+  if (stmts.length) { if (env.DB.batch) await env.DB.batch(stmts); else for (const st of stmts) await st.run(); }
+  await env.DB.prepare('INSERT INTO hh (id,created,seen) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET seen=excluded.seen').bind(hh, now, now).run();
+  return reply({ ok: true, added, skipped: names.length - added });
+}
+
+export function listAddPreflight(req) {
+  const cors = summaryCors(req.headers.get('origin'));
+  return new Response(null, { status: 204, headers: cors ? { ...cors, 'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '600' } : {} });
 }
