@@ -21,6 +21,7 @@ import re
 import sys
 import time
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -83,21 +84,32 @@ def cbs_towns():
 
 
 def geocode(city):
-    """(lat, lon) of an Israeli town by its Hebrew name, or None."""
-    url = "https://geocoding-api.open-meteo.com/v1/search?" + urllib.parse.urlencode({"name": city, "count": 1, "language": "he", "countryCode": "IL"})
-    try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
-            res = json.load(r).get("results") or []
-        if res:
-            return round(res[0]["latitude"], 4), round(res[0]["longitude"], 4)
-    except Exception:
-        pass
+    """(lat, lon) of an Israeli town by its Hebrew name, or None. Tries a few spellings."""
+    tries = [city, city.replace("-", " "), city.split(" - ")[0], city.split("-")[0], city.replace("קרית", "קריית"), city.replace("קריית", "קרית")]
+    for name in dict.fromkeys(t.strip() for t in tries if t.strip()):
+        url = "https://geocoding-api.open-meteo.com/v1/search?" + urllib.parse.urlencode({"name": name, "count": 1, "language": "he", "countryCode": "IL"})
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
+                    res = json.load(r).get("results") or []
+                if res:
+                    return round(res[0]["latitude"], 4), round(res[0]["longitude"], 4)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code == 429:  # too fast: wait and try again
+                    time.sleep(5 * (attempt + 1))
+                    continue
+                break
+            except Exception:
+                break
+            finally:
+                time.sleep(0.15)
     return None
 
 
 class Towns:
     def __init__(self, known, cbs, geo):
-        self.known, self.cbs, self.geo, self.new = dict(known), cbs, geo, {}
+        self.known, self.cbs, self.geo, self.new, self.looked = dict(known), cbs, geo, {}, 0
 
     def name(self, s):
         c = clean_city(s.city)
@@ -110,16 +122,16 @@ class Towns:
         return c
 
     def where(self, city):
+        """Coordinates of a town; a town not found before is looked up again (up to 200 a night)."""
         if not city:
             return None
-        if city not in self.known:
+        if self.known.get(city) is None and self.looked < 200 and city not in self.new:
+            self.looked += 1
             ll = self.geo(city)
-            if not ll and " " in city:
-                ll = self.geo(city.split(" - ")[0].split(" ")[0])
-            self.known[city] = ll
             self.new[city] = ll
-            time.sleep(0.05)
-        return self.known[city]
+            if ll:
+                self.known[city] = ll
+        return self.known.get(city)
 
 
 # ---- prices ------------------------------------------------------------------------------
@@ -267,6 +279,8 @@ def run(ilp, configs, wanted=(), places=None, now=None, towns=None):
     status["skipped"] = want[MAX_WANTED:]
 
     for city, ll in towns.new.items():
+        if not ll:
+            continue
         sql.append(f"INSERT INTO places (city,lat,lon,ts) VALUES ({q(city)},{q(ll[0] if ll else None)},{q(ll[1] if ll else None)},{ts}) ON CONFLICT(city) DO UPDATE SET lat=excluded.lat,lon=excluded.lon,ts=excluded.ts;")
     sql.append(f"INSERT INTO kv (k,v) VALUES ('prices:defaults',{q(json.dumps(defaults))}) ON CONFLICT(k) DO UPDATE SET v=excluded.v;")
     sql.append(f"INSERT INTO kv (k,v) VALUES ('prices:status',{q(json.dumps(status, ensure_ascii=False))}) ON CONFLICT(k) DO UPDATE SET v=excluded.v;")
