@@ -1,4 +1,5 @@
 """Offline check of fetch.py with fake chain data: python -m unittest prices/test_fetch.py"""
+import json
 import sqlite3
 import sys
 import unittest
@@ -22,13 +23,17 @@ class FakeIlp:
     def __init__(self, fail=None):
         self.fail = fail
 
+    def list_chains(self):
+        mk = lambda slug, he, fam="cerberus": NS(slug=slug, name_he=he, implemented=True, sector="supermarket", portal_family=fam)
+        return [mk("yochananof", "יוחננוף"), mk("rami-levy", "רמי לוי"), mk("carrefour", "קרפור"), mk("victory", "ויקטורי", "laib")]
+
     def get_stores(self, chain):
         if chain == self.fail:
             raise RuntimeError("portal down")
         return NS(stores=[
             NS(store_id="7", name="סניף באר שבע", address="", city="באר שבע", sub_chain_name=None),
-            NS(store_id="12", name="נתיבות מנהטן", address="שד' ירושלים", city="נתיבות", sub_chain_name=None),
-            NS(store_id="31", name="פארק נועם", address="", city="", sub_chain_name=None),
+            NS(store_id="12", name="מנהטן", address="שד' ירושלים", city="246", sub_chain_name=None),
+            NS(store_id="31", name="פארק נועם נתיבות", address="", city="", sub_chain_name=None),
         ])
 
     def get_prices(self, chain, store_id):
@@ -51,32 +56,37 @@ class FetchTest(unittest.TestCase):
         con.executescript("\n".join(sql))
         return con
 
-    def test_loads_matching_stores_with_promos(self):
-        cfgs = [{"chain": "yochananof", "label": "יוחננוף", "keys": ["נתיבות"], "prefer": ["מנהטן"]},
-                {"chain": "rami-levy", "label": "רמי לוי", "keys": ["נועם"]}]
-        sql, status = fetch.run(FakeIlp(), cfgs, now=NOW)
-        con = self.db(sql)
-        rows = con.execute("SELECT chain, code, price, promo, pprice, store FROM prices ORDER BY chain, code").fetchall()
-        self.assertEqual(len(rows), 4)  # two barcoded items per store; the loose one is skipped
-        flour = [r for r in rows if r[0] == "יוחננוף" and r[1] == "07290000000017"][0]
-        self.assertEqual((flour[2], flour[3], flour[4]), (16.9, "2 ב-30", 15.0))
-        self.assertEqual(flour[5], "נתיבות מנהטן")
-        milk = [r for r in rows if r[1] == "07290000000024"][0]
-        self.assertEqual((milk[3], milk[4]), ("", None), "expired promotion ignored")
-        self.assertEqual(status["chains"]["רמי לוי"]["store_id"], "31")
+    def towns(self):
+        geo = {"באר שבע": (31.25, 34.79), "נתיבות": (31.42, 34.59)}
+        return fetch.Towns({}, {"246": "נתיבות"}, lambda c: geo.get(c))
 
-    def test_failed_chain_keeps_old_prices_and_reports(self):
-        cfgs = [{"chain": "victory", "label": "ויקטורי", "keys": ["נתיבות"]}]
-        first, _ = fetch.run(FakeIlp(), cfgs, now=NOW)
+    def test_branches_defaults_and_wanted_prices(self):
+        cfgs = [{"chain": "yochananof", "label": "יוחננוף", "keys": ["נתיבות"], "prefer": ["מנהטן"], "city_code": "246"},
+                {"chain": "victory", "label": "ויקטורי", "keys": ["נתיבות"]}]
+        sql, status = fetch.run(FakeIlp(), cfgs, wanted=["rami-levy:7", "victory:3", "rami-levy:7"], now=NOW, towns=self.towns())
+        con = self.db(sql)
+        self.assertEqual(con.execute("SELECT COUNT(*) FROM branches").fetchone()[0], 9, "three branches in each of three chains, Laib left to the Worker")
+        b = con.execute("SELECT city, lat FROM branches WHERE sid='yochananof:31'").fetchone()
+        self.assertEqual(b, ("נתיבות", 31.42), "a branch with no town takes one found in its name; a town code is resolved")
+        self.assertEqual(json.loads(con.execute("SELECT v FROM kv WHERE k='prices:defaults'").fetchone()[0]), ["yochananof:12"])
+        sids = [r[0] for r in con.execute("SELECT DISTINCT sid FROM sprices ORDER BY sid")]
+        self.assertEqual(sids, ["rami-levy:7", "yochananof:12"])
+        flour = con.execute("SELECT price, promo, pprice FROM sprices WHERE sid='yochananof:12' AND code='07290000000017'").fetchone()
+        self.assertEqual(flour, (16.9, "2 ב-30", 15.0))
+        milk = con.execute("SELECT promo, pprice FROM sprices WHERE code='07290000000024' LIMIT 1").fetchone()
+        self.assertEqual(milk, ("", None), "expired promotion ignored")
+        self.assertEqual(con.execute("SELECT lat FROM places WHERE city='באר שבע'").fetchone()[0], 31.25)
+
+    def test_failed_branch_keeps_old_prices_and_reports(self):
+        first, _ = fetch.run(FakeIlp(), [], wanted=["carrefour:7"], now=NOW, towns=self.towns())
         con = self.db(first)
-        second, status = fetch.run(FakeIlp(fail="victory"), cfgs, now=NOW)
+        second, status = fetch.run(FakeIlp(fail="carrefour"), [], wanted=["carrefour:7"], now=NOW, towns=self.towns())
         con.executescript("\n".join(second))
-        self.assertEqual(con.execute("SELECT COUNT(*) FROM prices").fetchone()[0], 2)
-        self.assertIn("portal down", status["chains"]["ויקטורי"]["error"])
-        self.assertIn("portal down", con.execute("SELECT v FROM kv WHERE k='prices:status'").fetchone()[0])
+        self.assertEqual(con.execute("SELECT COUNT(*) FROM sprices").fetchone()[0], 2)
+        self.assertIn("portal down", status["branches"]["קרפור"]["error"])
 
     def test_no_store_lists_candidates(self):
-        sql, status = fetch.run(FakeIlp(), [{"chain": "carrefour", "label": "קרפור", "keys": ["אופקים"]}], now=NOW)
+        sql, status = fetch.run(FakeIlp(), [{"chain": "carrefour", "label": "קרפור", "keys": ["אופקים"]}], now=NOW, towns=self.towns())
         self.assertEqual(status["chains"]["קרפור"]["error"], "no matching store")
 
 

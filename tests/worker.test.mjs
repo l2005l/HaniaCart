@@ -181,8 +181,10 @@ test('Victory and Hyper Cohen are read from the Laib portal when the app asks', 
   };
   try {
     const r = await (await call(env, 'POST', '/api/prices/refresh', { hh: HH })).json();
-    assert.equal(r.ran, true); assert.equal(r.status.chains['ויקטורי'].count, 1);
-    const row = env.DB.raw.prepare("SELECT * FROM prices WHERE chain='ויקטורי'").get();
+    assert.equal(r.ran, true); assert.equal(r.status.stores['victory:21'].count, 1); assert.equal(r.status.chains['ויקטורי'].branches, 2);
+    assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM branches WHERE chain='victory'").get().n, 2, 'every branch is listed for the picker');
+    assert.deepEqual(JSON.parse(env.DB.raw.prepare("SELECT v FROM kv WHERE k='prices:laib-defaults'").get().v), ['victory:21', 'het-cohen:21']);
+    const row = env.DB.raw.prepare("SELECT * FROM sprices WHERE sid='victory:21'").get();
     assert.equal(row.code, '07290000000015'); assert.equal(row.name, 'קמח כוסמין "זהב"'); assert.equal(row.price, 16.4); assert.equal(row.unit, '1 קילו');
     assert.ok(!seen.some((u) => u.includes('-007-')), 'only the Netivot store is downloaded');
     assert.equal((await (await call(env, 'POST', '/api/prices/refresh', { hh: HH })).json()).ran, false, 'not again while fresh');
@@ -331,4 +333,58 @@ test('Hania Today adds to the shopping list of the saved household, once per nam
   assert.deepEqual(names, ['ביצים', 'חלב', 'לחם']);
   assert.equal((await add(['x'], 'https://evil.example')).status, 403);
   assert.equal((await add(['x'], 'https://today.hania360.com', '')).status, 401);
+});
+
+test('a household picks branches near it and sees their prices and deals', async () => {
+  const env = { DB: fakeD1() }, db = env.DB.raw;
+  const br = db.prepare('INSERT INTO branches (sid,chain,label,store_id,name,city,address,lat,lon,ts) VALUES (?,?,?,?,?,?,?,?,?,1)');
+  br.run('shufersal:12', 'shufersal', 'שופרסל', '12', 'שופרסל דיל', 'באר שבע', '', 31.25, 34.79);
+  br.run('rami-levy:7', 'rami-levy', 'רמי לוי', '7', 'רמי לוי באר שבע', 'באר שבע', '', 31.26, 34.8);
+  br.run('rami-levy:31', 'rami-levy', 'רמי לוי', '31', 'פארק נועם', 'נתיבות', '', 31.42, 34.59);
+  br.run('osher-ad:3', 'osher-ad', 'אושר עד', '3', 'אושר עד', 'חיפה', '', 32.79, 34.99);
+  db.prepare('INSERT INTO places (city,lat,lon,ts) VALUES (?,?,?,1)').run('באר שבע', 31.25, 34.79);
+  const pr = db.prepare('INSERT INTO sprices (sid,code,name,price,unit,promo,pprice,ts) VALUES (?,?,?,?,?,?,?,1)');
+  pr.run('shufersal:12', '07290000000017', 'קמח כוסמין זהב', 16.9, '', '2 ב-30', 15);
+  pr.run('rami-levy:7', '07290000000017', 'קמח כוסמין זהב', 14.9, '', '', null);
+  pr.run('rami-levy:7', '07290000000031', 'חלב 3% טרה 1 ליטר', 6.9, '', '3 ב-18', 6);
+  pr.run('rami-levy:7', '07290000000048', 'שוקולד חלב פרה', 7.9, '', '1+1', 3.95);
+  pr.run('rami-levy:31', '07290000000017', 'קמח כוסמין זהב', 13.9, '', '', null);
+  db.prepare("INSERT INTO kv (k,v) VALUES ('prices:defaults', ?)").run(JSON.stringify(['rami-levy:31']));
+
+  let r = await (await call(env, 'GET', '/api/prices?codes=7290000000017', { hh: HH })).json();
+  assert.deepEqual(r.prices['07290000000017'].map((x) => x.chain), ['רמי לוי'], 'before picking: the default branch');
+
+  const near = await (await call(env, 'GET', '/api/stores/near?q=' + encodeURIComponent('באר שבע'), { hh: HH })).json();
+  assert.equal(near.place, 'באר שבע');
+  assert.deepEqual(near.branches.map((b) => b.sid), ['shufersal:12', 'rami-levy:7', 'rami-levy:31'], 'nearest first (Netivot is 25 km away), Haifa left out');
+  assert.equal(near.branches[0].loaded, true);
+  const geo = await (await call(env, 'GET', '/api/stores/near?lat=31.42&lon=34.59', { hh: HH })).json();
+  assert.equal(geo.branches[0].sid, 'rami-levy:31');
+
+  const set = await (await call(env, 'POST', '/api/stores/mine', { hh: HH, body: { sids: ['shufersal:12', 'rami-levy:7', 'nope:1', 'bad'], place: 'באר שבע' } })).json();
+  assert.deepEqual(set.sids, ['shufersal:12', 'rami-levy:7']); assert.equal(set.waiting, 0);
+  const mine = await (await call(env, 'GET', '/api/stores/mine', { hh: HH })).json();
+  assert.equal(mine.mine, true); assert.equal(mine.branches.length, 2);
+
+  r = await (await call(env, 'GET', '/api/prices?codes=7290000000017', { hh: HH })).json();
+  assert.deepEqual(r.prices['07290000000017'].map((x) => [x.chain, x.pprice || x.price]), [['רמי לוי', 14.9], ['שופרסל', 15]]);
+  r = await (await call(env, 'GET', '/api/prices?codes=7290000000017', { hh: HH2 })).json();
+  assert.equal(r.prices['07290000000017'][0].price, 13.9, 'another household still has the defaults');
+
+  await put(env, HH, [{ kind: 'fav', id: 'fav1x', data: { name: 'קמח כוסמין', code: '7290000000017' } }, { kind: 'list', id: 'list1', data: { name: 'קמח כוסמין' } }, { kind: 'list', id: 'list2', data: { name: 'חלב' } }, { kind: 'list', id: 'list3', data: { name: 'אורז', done: true } }]);
+  const d = await (await call(env, 'GET', '/api/prices/deals', { hh: HH })).json();
+  assert.deepEqual(d.deals.map((x) => [x.item, x.chain, x.promo, x.sure]), [['קמח כוסמין', 'שופרסל', '2 ב-30', true], ['חלב', 'רמי לוי', '3 ב-18', false]], 'milk by name, not the milk chocolate');
+
+  const sub = 'https://fcm.googleapis.com/fcm/send/x';
+  await call(env, 'POST', '/api/push/sub', { hh: HH, body: { sub: { endpoint: sub }, hour: ilNow().hour } });
+  const orig = globalThis.fetch; globalThis.fetch = async () => new Response('', { status: 201 });
+  try {
+    await runReminders(env);
+    let msg = await (await call(env, 'POST', '/api/push/msg', { body: { endpoint: sub } })).json();
+    assert.match(msg.body, /2 מבצעים חדשים על מה שברשימה/);
+    db.prepare("UPDATE push_subs SET sent=''").run();
+    await runReminders(env);
+    msg = await (await call(env, 'POST', '/api/push/msg', { body: { endpoint: sub } })).json();
+    assert.deepEqual(msg, {}, 'the same deals are not sent twice');
+  } finally { globalThis.fetch = orig; }
 });
