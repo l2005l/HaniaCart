@@ -40,4 +40,5 @@ jobs:
       - name: Load the prices
         run: npx wrangler d1 execute haniacart --remote --file prices.sql -y
       - name: Refresh Victory, Hyper Cohen and Mahsanei HaShuk through the Israel relay
-        run: curl -sS -m 600 -X POST https://cart.hania360.com/api/prices/refresh -H "x-hh: nightly-job-refresh-000000000" -H 'content-type: application/json' -d '{}' | head -c 2000
+        run: |
+          curl -sS -m 600 -X POST https://cart.hania360.com/api/prices/refresh -H "x-hh: nightly-job-refresh-000000000" -H 'content-type: application/json' -d '{}' | head -c 2000
