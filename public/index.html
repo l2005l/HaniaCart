@@ -138,6 +138,13 @@ dialog form.addrow{flex-direction:row;gap:8px}
 .pv-img{width:100%;max-height:55vh;object-fit:contain;border-radius:14px;background:var(--bg)}
 .desc{color:var(--ink);font-size:.86rem}
 .best{font-size:.84rem;color:var(--ok);font-weight:600}
+.dealbar{display:flex;align-items:center;gap:10px;width:100%;text-align:start;border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line));background:color-mix(in srgb,var(--warn) 10%,var(--surface));border-radius:16px;padding:12px 14px;font-weight:700;min-height:52px}
+.dealbar span{flex:1}
+.dealbar small{color:var(--muted);font-weight:600}
+.deal .dprice{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.deal .was{color:var(--muted);text-decoration:line-through;font-size:.78rem}
+.st .km{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.st .wait{color:var(--warn);font-size:.78rem}
 .promo{font-size:.74rem;font-weight:700;border-radius:6px;padding:1px 6px;color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent);white-space:nowrap}
 .namebtn{border:0;background:none;padding:0;min-height:0;font-weight:inherit;text-align:start;cursor:pointer;color:inherit}
 .basket .row{min-height:44px}
@@ -359,6 +366,11 @@ dialog form.addrow{flex-direction:row;gap:8px}
       </div>
       <button id="pushTest" type="button" hidden>שליחת התראת בדיקה</button>
     </div>
+    <div class="card">
+      <b>הסניפים להשוואה</b>
+      <p class="note" id="sStores">…</p>
+      <button type="button" id="sStoresBtn">בחירת סניפים קרובים</button>
+    </div>
     <div class="card" id="installCard">
       <b>התקנה כאפליקציה</b>
       <p class="note" id="installNote"></p>
@@ -369,6 +381,26 @@ dialog form.addrow{flex-direction:row;gap:8px}
       <p class="note">הדביקו קישור הצטרפות שקיבלתם. מה שרשום כרגע במכשיר הזה יוחלף ברשימה של הבית ההוא.</p>
       <div class="addrow"><input type="text" id="sJoin" placeholder="קישור הצטרפות" aria-label="קישור הצטרפות"><button id="sJoinGo" type="button">הצטרפות</button></div>
     </details>
+  </div>
+</dialog>
+
+<dialog id="stores">
+  <div class="sheet">
+    <div class="sheet-head"><h2>הסניפים שלכם</h2><button type="button" class="quiet" id="stClose">סגור</button></div>
+    <p class="note">בוחרים עד 10 סניפים קרובים. המחירים והמבצעים יושוו רק ביניהם.</p>
+    <form class="addrow" id="stForm"><input type="search" id="stQ" placeholder="עיר או יישוב, למשל: באר שבע" aria-label="עיר"><button type="submit">חיפוש</button></form>
+    <button type="button" id="stGeo">📍 לפי המיקום שלי</button>
+    <p class="note" id="stMsg" hidden></p>
+    <div class="rows" id="stList" hidden></div>
+    <button class="primary" type="button" id="stSave" hidden>שמירה</button>
+  </div>
+</dialog>
+
+<dialog id="deals">
+  <div class="sheet">
+    <div class="sheet-head"><h2>🔥 מבצעים על הרשימה שלכם</h2><button type="button" class="quiet" id="dlClose">סגור</button></div>
+    <div class="rows" id="dlList"></div>
+    <p class="note" id="dlNote"></p>
   </div>
 </dialog>
 
@@ -803,7 +835,8 @@ function basketCard(items) {
       var c = chains[n];
       return h('div', { class: 'row' }, h('div', { class: 'main name' }, n), h('span', { class: 'meta' }, c.n + ' מתוך ' + priced.length), h('span', { class: 'pill' + (i === 0 ? ' ok' : '') }, fmt(c.total)));
     })),
-    h('p', { class: 'meta' }, priced.length + ' מתוך ' + items.length + ' המוצרים ברשימה מחוברים לברקוד. לחיצה על שם מוצר מחברת אותו.'));
+    h('p', { class: 'meta' }, priced.length + ' מתוך ' + items.length + ' המוצרים ברשימה מחוברים לברקוד. לחיצה על שם מוצר מחברת אותו.'),
+    h('button', { type: 'button', class: 'quiet', style: 'align-self:flex-start', onclick: openStores }, MYST && MYST.mine ? 'הסניפים שלכם · לשנות' : '📍 להשוות בסניפים הקרובים אליכם'));
 }
 
 /* product photos: what exactly this family buys */
@@ -938,7 +971,9 @@ function renderList() {
         h('button', { type: 'button', class: 'x', 'aria-label': 'הסר את ' + l.name, onclick: function () { var u = snap([['list', l.id]]); put('list', l.id, null); toast(l.name + ' הוסר', u); } }, '✕')));
     });
   });
-  box.replaceChildren.apply(box, [basket, h('div', { class: 'rows' }, rows)].filter(Boolean));
+  loadDeals();
+  var dbar = DEALS.length ? h('button', { type: 'button', class: 'dealbar', onclick: openDeals }, '🔥', h('span', null, DEALS.length === 1 ? 'מבצע על ' + DEALS[0].item : DEALS.length + ' מבצעים על מה שברשימה'), h('small', null, 'לראות')) : null;
+  box.replaceChildren.apply(box, [dbar, basket, h('div', { class: 'rows' }, rows)].filter(Boolean));
 }
 function splitList(text) {
   var seen = {}, out = [];
@@ -1220,7 +1255,7 @@ $('ePhoto').addEventListener('change', function (e) {
 function joinLink() { return location.origin + '/#join=' + HH; }
 $('openSettings').addEventListener('click', function () {
   $('sLink').value = joinLink(); $('sName').value = ME; $('pushOn').checked = ls('hc.push') === '1'; $('pushTest').hidden = ls('hc.push') !== '1';
-  $('pushHour').value = ls('hc.hour') || '9'; updateInstall(); accLoad(); $('settings').showModal();
+  $('pushHour').value = ls('hc.hour') || '9'; updateInstall(); accLoad(); loadMine(); $('settings').showModal();
 });
 $('sClose').addEventListener('click', function () { $('settings').close(); });
 $('sName').addEventListener('change', function () { ME = $('sName').value.trim().slice(0, 30); ls('hc.name', ME); toast('השם נשמר'); });
@@ -1334,6 +1369,96 @@ function accChange(path, done) {
 $('accLink').addEventListener('click', function () { accChange('/api/account/link', 'הבית נשמר בחשבון'); });
 $('accUnlink').addEventListener('click', function () { accChange('/api/account/unlink', 'הבית הוסר מהחשבון'); });
 
+/* branches near the household, and promotions on the open list */
+var MYST = null, DEALS = [], dealsKey = '', dealsAt = 0, dealsT, stPick = {}, stPlace = '';
+function loadMine() { return api('GET', '/api/stores/mine').then(function (j) { MYST = j; showMine(); return j; }, function () {}); }
+function showMine() {
+  if (!MYST) return;
+  $('sStores').textContent = MYST.branches.length ? (MYST.mine ? '' : 'ברירת מחדל: ') + MYST.branches.map(function (b) { return b.show + (b.name && MYST.mine ? ' (' + b.name + ')' : ''); }).join(' · ') : 'עוד לא נבחרו סניפים.';
+}
+function openStores() {
+  stPick = {}; (MYST && MYST.mine ? MYST.branches : []).forEach(function (b) { stPick[b.sid] = b; });
+  $('stQ').value = (MYST && MYST.place) || ''; $('stList').hidden = true; $('stSave').hidden = true; $('stMsg').hidden = true;
+  if ($('settings').open) $('settings').close();
+  $('stores').showModal();
+  if ($('stQ').value) findStores({ q: $('stQ').value });
+}
+function stMsg(t) { $('stMsg').hidden = !t; $('stMsg').textContent = t || ''; }
+function findStores(by) {
+  stMsg('מחפש סניפים…');
+  api('GET', '/api/stores/near?' + (by.q ? 'q=' + encodeURIComponent(by.q) : 'lat=' + by.lat + '&lon=' + by.lon)).then(function (j) {
+    if (j.error === 'place') { stMsg('לא מצאנו את המקום. נסו לכתוב את שם העיר אחרת.'); return; }
+    if (!j.branches.length) { stMsg('לא מצאנו סניפים ברשתות שאנחנו מכירים במרחק של עד 30 ק״מ.'); return; }
+    stPlace = j.place || stPlace;
+    stMsg(j.branches.length + ' סניפים' + (j.place ? ' ליד ' + j.place : ' לידכם') + '. מסמנים את אלה שקונים בהם.');
+    var list = j.branches.slice();
+    Object.keys(stPick).forEach(function (sid) { if (!list.some(function (b) { return b.sid === sid; })) list.unshift(stPick[sid]); });
+    $('stList').replaceChildren.apply($('stList'), list.map(function (b) {
+      var box = h('input', { type: 'checkbox', class: 'check', checked: !!stPick[b.sid], 'aria-label': (b.chain || b.show) + ' ' + (b.name || ''), onchange: function (e) {
+        if (e.target.checked && Object.keys(stPick).length >= 10) { e.target.checked = false; toast('אפשר עד 10 סניפים'); return; }
+        if (e.target.checked) stPick[b.sid] = b; else delete stPick[b.sid];
+        $('stSave').textContent = 'שמירה (' + Object.keys(stPick).length + ')';
+      } });
+      return h('label', { class: 'row st' }, box, h('div', { class: 'main' }, h('div', { class: 'name' }, withChain(b.chain || b.show, b.name || b.city)), h('div', { class: 'meta' }, [b.address, b.city].filter(Boolean).join(', '), b.loaded === false ? h('span', { class: 'wait' }, ' · מחירים מחר בבוקר') : null)), b.km != null ? h('span', { class: 'km' }, b.km < 1 ? 'פחות מק״מ' : b.km + ' ק״מ') : null);
+    }));
+    $('stList').hidden = false; $('stSave').hidden = false; $('stSave').textContent = 'שמירה (' + Object.keys(stPick).length + ')';
+  }, function () { stMsg('אין חיבור כרגע. נסו שוב.'); });
+}
+$('stForm').addEventListener('submit', function (e) { e.preventDefault(); var q = $('stQ').value.trim(); if (q) findStores({ q: q }); });
+$('stGeo').addEventListener('click', function () {
+  if (!navigator.geolocation) { stMsg('בטלפון הזה אין מיקום. כתבו את שם העיר.'); return; }
+  stMsg('מאתר מיקום…');
+  navigator.geolocation.getCurrentPosition(function (p) { stPlace = ''; findStores({ lat: p.coords.latitude.toFixed(3), lon: p.coords.longitude.toFixed(3) }); }, function () { stMsg('לא קיבלנו מיקום. כתבו את שם העיר.'); }, { timeout: 12000, maximumAge: 600000 });
+});
+$('stSave').addEventListener('click', function () {
+  api('POST', '/api/stores/mine', { sids: Object.keys(stPick), place: stPlace || $('stQ').value.trim() }).then(function (j) {
+    $('stores').close(); PR = {}; prAsked = {}; DEALS = []; dealsAt = 0; dealsKey = '';
+    toast(j.waiting ? 'נשמר. המחירים של ' + (j.waiting === 1 ? 'סניף אחד' : j.waiting + ' סניפים') + ' יגיעו עד מחר בבוקר' : 'נשמר. ההשוואה לפי הסניפים שלכם');
+    loadMine(); render();
+  }, function () { toast('השמירה נכשלה. נסו שוב.'); });
+});
+$('stClose').addEventListener('click', function () { $('stores').close(); });
+$('sStoresBtn').addEventListener('click', openStores);
+
+function loadDeals() {
+  var open = all('list').filter(function (l) { return !l.done; });
+  var key = open.map(function (l) { return l.name; }).sort().join('|');
+  if (!open.length) { DEALS = []; dealsKey = key; return; }
+  if (key === dealsKey && Date.now() - dealsAt < 10 * 60000) return;
+  dealsKey = key; clearTimeout(dealsT);
+  // After the list reaches the server, so it sees the latest items.
+  dealsT = setTimeout(function () {
+    api('GET', '/api/prices/deals').then(function (j) {
+      dealsAt = Date.now();
+      var before = DEALS.map(dealId).join(); DEALS = j.deals || [];
+      if (DEALS.map(dealId).join() !== before && tab === 'list') renderList();
+      popDeals();
+    }, function () {});
+  }, 1800);
+}
+// "שופרסל" + "שופרסל דיל" reads as "שופרסל דיל"; "רמי לוי" + "פארק נועם" as "רמי לוי · פארק נועם".
+function withChain(chain, name) { return !name ? chain : name.indexOf(chain.split(' ')[0]) >= 0 ? name : chain + ' · ' + name; }
+function dealId(d) { return d.item + '|' + d.sid + '|' + d.promo; }
+// Pops up by itself once for every deal it has not shown yet.
+function popDeals() {
+  var seen = (ls('hc.deals') || '').split('\n'), fresh = DEALS.filter(function (d) { return seen.indexOf(dealId(d)) < 0; });
+  if (!fresh.length || document.querySelector('dialog[open]')) return;
+  ls('hc.deals', DEALS.map(dealId).concat(seen).slice(0, 300).join('\n'));
+  openDeals(fresh);
+}
+function openDeals(only) {
+  var list = Array.isArray(only) ? only : DEALS;
+  $('dlList').replaceChildren.apply($('dlList'), list.map(function (d) {
+    return h('div', { class: 'row deal' }, h('div', { class: 'main' },
+      h('div', { class: 'name' }, d.item + (d.sure ? '' : ' · ' + d.name)),
+      h('div', { class: 'meta' }, withChain(d.chain, d.store) + (d.sure ? '' : ' · אולי זה המוצר שלכם'))),
+      h('div', { class: 'dprice' }, h('span', { class: 'promo' }, d.promo), h('span', { class: 'pill ok' }, fmt2(d.pprice || d.price)), d.pprice ? h('span', { class: 'was' }, fmt2(d.price)) : null));
+  }));
+  $('dlNote').textContent = (Array.isArray(only) && only.length < DEALS.length ? 'חדשים מאז הפעם הקודמת. ' : '') + 'מחירי מבצע מקובצי הרשתות, לכל הלקוחות, בלי מועדון וקופונים. בודקים בקופה.';
+  $('deals').showModal();
+}
+$('dlClose').addEventListener('click', function () { $('deals').close(); });
+
 /* ---------- boot ---------- */
 $('mPrefs').value = ls('hc.prefs') || ''; $('mPeople').value = ls('hc.people') || '2';
 var hash = location.hash.slice(1), jm = hash.match(/^join=([A-Za-z0-9_-]{24,48})$/);
@@ -1351,7 +1476,8 @@ if (shared) {
   if (parts.length) setTimeout(function () { ask('להוסיף לרשימת הקניות?', parts.map(function (p) { return p.name + (p.qty > 1 ? ' ×' + p.qty : ''); }).join(' · '), 'הוסף ' + parts.length, function () { setTab('list'); addMany(shared); }); }, 80);
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
-flush(); pull();
+flush(); pull(); loadMine();
+if (hash === 'deals') { history.replaceState(null, '', location.pathname + location.search); setTab('list'); setTimeout(function () { dealsAt = 0; dealsKey = ''; loadDeals(); setTimeout(function () { if (DEALS.length) openDeals(); }, 2600); }, 300); }
 // Victory and Hyper Cohen prices are fetched through the visitor's Cloudflare location in Israel; the server decides if they are stale.
 setTimeout(function () { api('POST', '/api/prices/refresh', {}).then(function (j) { if (j.ran) { PR = {}; prAsked = {}; render(); } }, function () {}); }, 4000);
 })();

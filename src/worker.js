@@ -1,6 +1,6 @@
 import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
 import { gtin14 } from './gtin.js';
-import { refreshLaib } from './laib.js';
+import { refreshLaib, LAIB_SLUGS } from './laib.js';
 import { getAccount, linkAccount, unlinkAccount, accountSummary, summaryPreflight, accountListAdd, listAddPreflight } from './account.js';
 export { gtin14 };
 // HaniaCart API. A household is a long random key both phones keep (sent as x-hh). Accounts are optional:
@@ -226,29 +226,145 @@ async function delPhoto(req, env) {
   return json({ ok: true });
 }
 
-/* ---- chain prices ---- */
-const priceRow = (r) => ({ chain: r.chain, store: r.store, name: r.name, price: r.price, unit: r.unit, promo: r.promo, pprice: r.pprice, ts: r.ts });
+/* ---- chain prices, by branch ---- */
+// A household compares the branches it picked (hh_stores), or the default ones near Netivot.
+// Prices are in sprices by branch (sid = "<chain>:<store id>"); the older prices table is only
+// read until the first nightly load by branch has run.
+const MAX_SIDS = 10;
+const okSid = (s) => typeof s === 'string' && /^[a-z0-9-]{2,30}:[0-9A-Za-z]{1,12}$/.test(s);
+async function kvJson(env, k, d) { const r = await env.DB.prepare('SELECT v FROM kv WHERE k=?').bind(k).first(); try { return r ? JSON.parse(r.v) : d; } catch { return d; } }
+export async function hhSids(env, hh) {
+  const r = await env.DB.prepare('SELECT sids, place FROM hh_stores WHERE hh=?').bind(hh).first();
+  if (r) { try { const a = JSON.parse(r.sids).filter(okSid); if (a.length) return { sids: a.slice(0, MAX_SIDS), mine: true, place: r.place }; } catch {} }
+  const a = [...(await kvJson(env, 'prices:defaults', [])), ...(await kvJson(env, 'prices:laib-defaults', []))].filter(okSid);
+  return { sids: [...new Set(a)].slice(0, MAX_SIDS), mine: false, place: '' };
+}
+const marks = (n) => n.map(() => '?').join(',');
+async function branchInfo(env, sids) {
+  if (!sids.length) return {};
+  const { results } = await env.DB.prepare('SELECT sid, label, name, city, address, lat, lon FROM branches WHERE sid IN (' + marks(sids) + ')').bind(...sids).all();
+  const out = {}; for (const b of results) out[b.sid] = b;
+  // Two branches of one chain get their town (or branch name) after the chain name.
+  const per = {}; for (const s of sids) { const l = out[s] ? out[s].label : s.split(':')[0]; per[l] = (per[l] || 0) + 1; }
+  for (const s of sids) { const b = out[s] || (out[s] = { sid: s, label: s.split(':')[0], name: '', city: '' }); b.show = per[b.label] > 1 ? b.label + ' ' + (b.city || b.name) : b.label; }
+  return out;
+}
+async function useBranches(env, sids) {
+  if (!sids.length) return false;
+  return !!(await env.DB.prepare('SELECT 1 AS x FROM sprices WHERE sid IN (' + marks(sids) + ') LIMIT 1').bind(...sids).first());
+}
+const priceRow = (r, b) => ({ chain: b ? b.show : r.chain, sid: r.sid || '', store: b ? (b.name || b.city) : r.store, name: r.name, price: r.price, unit: r.unit, promo: r.promo, pprice: r.pprice, ts: r.ts });
 async function getPrices(req, env, url) {
-  if (!hhKey(req)) return bad('household');
+  const hh = hhKey(req); if (!hh) return bad('household');
   const codes = [...new Set(String(url.searchParams.get('codes') || '').split(',').map(gtin14).filter(Boolean))].slice(0, 200);
+  const { sids } = await hhSids(env, hh), byBranch = await useBranches(env, sids), info = byBranch ? await branchInfo(env, sids) : {};
   const out = {};
   for (let i = 0; i < codes.length; i += 50) {
     const part = codes.slice(i, i + 50);
-    const { results } = await env.DB.prepare('SELECT * FROM prices WHERE code IN (' + part.map(() => '?').join(',') + ')').bind(...part).all();
-    for (const r of results) (out[r.code] = out[r.code] || []).push(priceRow(r));
+    const { results } = byBranch
+      ? await env.DB.prepare('SELECT * FROM sprices WHERE sid IN (' + marks(sids) + ') AND code IN (' + marks(part) + ')').bind(...sids, ...part).all()
+      : await env.DB.prepare('SELECT * FROM prices WHERE code IN (' + marks(part) + ')').bind(...part).all();
+    for (const r of results) (out[r.code] = out[r.code] || []).push(priceRow(r, info[r.sid]));
   }
   for (const k in out) out[k].sort((a, b) => (a.pprice || a.price) - (b.pprice || b.price));
   return json({ prices: out });
 }
 // Products whose name holds every word typed, one row per barcode, cheapest first.
 async function searchPrices(req, env, url) {
-  if (!hhKey(req)) return bad('household');
+  const hh = hhKey(req); if (!hh) return bad('household');
   const words = str(url.searchParams.get('q'), 60).split(/\s+/).filter((w) => w.length > 1).slice(0, 5);
   if (!words.length) return json({ results: [] });
-  const { results } = await env.DB.prepare('SELECT code, name, MIN(price) AS min, COUNT(*) AS chains FROM prices WHERE ' + words.map(() => 'name LIKE ?').join(' AND ') + ' GROUP BY code ORDER BY chains DESC, min ASC LIMIT 25')
-    .bind(...words.map((w) => '%' + w + '%')).all();
+  const { sids } = await hhSids(env, hh), byBranch = await useBranches(env, sids);
+  const like = words.map(() => 'name LIKE ?').join(' AND '), args = words.map((w) => '%' + w + '%');
+  const { results } = byBranch
+    ? await env.DB.prepare('SELECT code, MAX(name) AS name, MIN(price) AS min, COUNT(*) AS chains FROM sprices WHERE sid IN (' + marks(sids) + ') AND ' + like + ' GROUP BY code ORDER BY chains DESC, min ASC LIMIT 25').bind(...sids, ...args).all()
+    : await env.DB.prepare('SELECT code, name, MIN(price) AS min, COUNT(*) AS chains FROM prices WHERE ' + like + ' GROUP BY code ORDER BY chains DESC, min ASC LIMIT 25').bind(...args).all();
   return json({ results: results.map((r) => ({ code: r.code, name: r.name, min: r.min, chains: r.chains })) });
 }
+
+/* ---- branches near the household ---- */
+const km = (a, b, c, d) => { const R = 6371, x = ((c - a) * Math.PI) / 180, y = ((d - b) * Math.PI) / 180; const h = Math.sin(x / 2) ** 2 + Math.cos((a * Math.PI) / 180) * Math.cos((c * Math.PI) / 180) * Math.sin(y / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+export async function placeOf(env, city) {
+  city = str(city, 40).replace(/["״׳']/g, (c) => (c === '׳' ? "'" : c === '״' ? '"' : c));
+  if (city.length < 2) return null;
+  const hit = await env.DB.prepare('SELECT city, lat, lon FROM places WHERE lat IS NOT NULL AND (city=? OR city LIKE ?) ORDER BY length(city) LIMIT 1').bind(city, city + '%').first();
+  if (hit) return hit;
+  try {
+    const r = await fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&language=he&countryCode=IL&name=' + encodeURIComponent(city), { signal: AbortSignal.timeout(8000) });
+    const g = ((await r.json()).results || [])[0];
+    if (!g) return null;
+    const p = { city, lat: Math.round(g.latitude * 1e4) / 1e4, lon: Math.round(g.longitude * 1e4) / 1e4 };
+    await env.DB.prepare('INSERT INTO places (city,lat,lon,ts) VALUES (?,?,?,?) ON CONFLICT(city) DO UPDATE SET lat=excluded.lat, lon=excluded.lon, ts=excluded.ts').bind(city, p.lat, p.lon, Date.now()).run();
+    return p;
+  } catch { return null; }
+}
+async function storesNear(req, env, url) {
+  const hh = hhKey(req); if (!hh) return bad('household');
+  let lat = +url.searchParams.get('lat'), lon = +url.searchParams.get('lon'), place = '';
+  if (!(lat > 29 && lat < 34 && lon > 34 && lon < 36)) {
+    const p = await placeOf(env, url.searchParams.get('q'));
+    if (!p) return json({ branches: [], error: 'place' });
+    lat = p.lat; lon = p.lon; place = p.city;
+  }
+  const { results } = await env.DB.prepare('SELECT sid, label, name, city, address, lat, lon FROM branches WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?').bind(lat - 0.3, lat + 0.3, lon - 0.35, lon + 0.35).all();
+  const list = results.map((b) => Object.assign(b, { km: Math.round(km(lat, lon, b.lat, b.lon) * 10) / 10 })).filter((b) => b.km <= 30).sort((a, b) => a.km - b.km).slice(0, 60);
+  const sids = list.map((b) => b.sid), loaded = new Set();
+  for (let i = 0; i < sids.length; i += 90) { const part = sids.slice(i, i + 90); (await env.DB.prepare('SELECT DISTINCT sid FROM sprices WHERE sid IN (' + marks(part) + ')').bind(...part).all()).results.forEach((r) => loaded.add(r.sid)); }
+  return json({ place, lat, lon, branches: list.map((b) => ({ sid: b.sid, chain: b.label, name: b.name, city: b.city, address: b.address, km: b.km, loaded: loaded.has(b.sid) })) });
+}
+async function storesMine(req, env) {
+  const hh = hhKey(req); if (!hh) return bad('household');
+  const s = await hhSids(env, hh), info = await branchInfo(env, s.sids);
+  return json({ mine: s.mine, place: s.place, branches: s.sids.map((sid) => ({ sid, chain: info[sid].label, show: info[sid].show, name: info[sid].name, city: info[sid].city })) });
+}
+async function setStores(req, env) {
+  const hh = hhKey(req); if (!hh) return bad('household');
+  const b = await req.json().catch(() => null); if (!b || !Array.isArray(b.sids)) return bad('json');
+  const want = [...new Set(b.sids.filter(okSid))].slice(0, MAX_SIDS);
+  if (!want.length) { await env.DB.prepare('DELETE FROM hh_stores WHERE hh=?').bind(hh).run(); return json({ ok: true, mine: false }); }
+  const known = new Set((await env.DB.prepare('SELECT sid FROM branches WHERE sid IN (' + marks(want) + ')').bind(...want).all()).results.map((r) => r.sid));
+  const sids = want.filter((s) => known.has(s));
+  if (!sids.length) return bad('stores');
+  await env.DB.prepare('INSERT INTO hh_stores (hh,sids,place,ts) VALUES (?,?,?,?) ON CONFLICT(hh) DO UPDATE SET sids=excluded.sids, place=excluded.place, ts=excluded.ts').bind(hh, JSON.stringify(sids), str(b.place, 40), Date.now()).run();
+  const loaded = (await env.DB.prepare('SELECT DISTINCT sid FROM sprices WHERE sid IN (' + marks(sids) + ')').bind(...sids).all()).results.length;
+  return json({ ok: true, mine: true, sids, waiting: sids.length - loaded });
+}
+
+/* ---- promotions on what the household is about to buy ---- */
+const normName = (s) => String(s || '').replace(/[֑-ׇ"'׳״.,()-]/g, ' ').replace(/\s+/g, ' ').trim();
+// One best deal per item on the open list: by barcode when the item is linked to one, otherwise by name.
+export async function dealsFor(env, hh, items) {
+  const { sids } = await hhSids(env, hh);
+  if (!sids.length || !(await useBranches(env, sids))) return [];
+  const info = await branchInfo(env, sids), out = [];
+  const best = (rows) => rows.filter((r) => r.promo).sort((a, b) => (a.pprice || a.price) - (b.pprice || b.price))[0];
+  const codes = items.filter((x) => x.code), named = items.filter((x) => !x.code).slice(0, 25);
+  for (let i = 0; i < codes.length; i += 40) {
+    const part = codes.slice(i, i + 40);
+    const { results } = await env.DB.prepare("SELECT * FROM sprices WHERE sid IN (" + marks(sids) + ") AND promo<>'' AND code IN (" + marks(part) + ')').bind(...sids, ...part.map((x) => x.code)).all();
+    for (const it of part) { const r = best(results.filter((x) => x.code === it.code)); if (r) out.push(Object.assign({ item: it.name, sure: true }, priceRow(r, info[r.sid]))); }
+  }
+  for (const it of named) {
+    const words = normName(it.name).split(' ').filter((w) => w.length > 1).slice(0, 3);
+    if (!words.length) continue;
+    // The first word starts the product name ("חלב" matches "חלב 3%", not "שוקולד חלב").
+    const { results } = await env.DB.prepare("SELECT * FROM sprices WHERE sid IN (" + marks(sids) + ") AND promo<>'' AND pprice IS NOT NULL AND name LIKE ?" + words.slice(1).map(() => ' AND name LIKE ?').join('') + ' LIMIT 40')
+      .bind(...sids, words[0] + '%', ...words.slice(1).map((w) => '%' + w + '%')).all();
+    const r = best(results); if (r) out.push(Object.assign({ item: it.name, sure: false }, priceRow(r, info[r.sid])));
+  }
+  return out;
+}
+async function listItemsOf(env, hh) {
+  const rows = (await env.DB.prepare("SELECT kind, data FROM rows WHERE hh=? AND kind IN ('list','fav') AND del=0").bind(hh).all()).results.map((r) => [r.kind, JSON.parse(r.data)]);
+  const favs = {}; for (const [k, d] of rows) if (k === 'fav' && d.code) favs[normName(d.name)] = d.code;
+  return rows.filter(([k, d]) => k === 'list' && !d.done).map(([, d]) => ({ name: d.name, code: favs[normName(d.name)] || '' })).slice(0, 80);
+}
+async function getDeals(req, env) {
+  const hh = hhKey(req); if (!hh) return bad('household');
+  const items = await listItemsOf(env, hh);
+  return json({ deals: items.length ? await dealsFor(env, hh, items) : [], items: items.length });
+}
+
 // Can this Cloudflare location reach the Laib portal (Victory, Hyper Cohen)? It times out from GitHub's servers.
 async function priceProbe(req, env) {
   const t0 = Date.now(), colo = (req.cf && req.cf.colo) || '';
@@ -263,29 +379,38 @@ async function priceProbe(req, env) {
   const all = (await env.DB.prepare("SELECT k,v FROM kv WHERE k LIKE 'probe:%'").all()).results.map((r) => JSON.parse(r.v));
   return json({ this: out, all });
 }
-// Opening the app asks for this; it runs only when Victory and Hyper Cohen are over 18 hours old,
+// Opening the app asks for this; it runs only when the Laib branches are over 18 hours old,
 // and once at a time. It runs here because the Laib portal answers Cloudflare's Israel location.
 async function priceRefresh(req, env) {
   if (!hhKey(req)) return bad('household');
   const now = Date.now(), colo = (req.cf && req.cf.colo) || '';
   if (req.cf && req.cf.country && req.cf.country !== 'IL') return json({ ran: false, reason: 'outside Israel' });
-  const last = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:laib'").first();
-  const st = last ? JSON.parse(last.v) : null;
-  const fresh = st && Object.values(st.chains || {}).every((c) => c.ok) && now - st.ts < 18 * 3600e3;
-  const recentTry = st && now - st.ts < 3 * 3600e3;
+  const st = await kvJson(env, 'prices:laib', null);
+  const wanted = await laibWanted(env);
+  const done = st && st.stores ? Object.keys(st.stores) : [];
+  const fresh = st && Object.values(st.chains || {}).every((c) => c.ok) && wanted.every((s) => done.includes(s)) && now - st.ts < 18 * 3600e3;
+  const recentTry = st && now - st.ts < 3 * 3600e3 && wanted.every((s) => done.includes(s));
   if (fresh || recentTry) return json({ ran: false, status: st });
   const lock = await env.DB.prepare("SELECT v FROM kv WHERE k='laib:lock'").first();
   if (lock && now - +lock.v < 10 * 60e3) return json({ ran: false, busy: true });
   await env.DB.prepare("INSERT INTO kv (k,v) VALUES ('laib:lock',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(String(now)).run();
-  const status = await refreshLaib(env, colo);
+  const status = await refreshLaib(env, colo, wanted);
   await env.DB.prepare("DELETE FROM kv WHERE k='laib:lock'").run();
   return json({ ran: true, status });
 }
+// Laib branches some household picked, most wanted first.
+async function laibWanted(env) {
+  const n = {};
+  for (const r of (await env.DB.prepare('SELECT sids FROM hh_stores').all()).results) { try { for (const s of JSON.parse(r.sids)) if (okSid(s) && LAIB_SLUGS.includes(s.split(':')[0])) n[s] = (n[s] || 0) + 1; } catch {} }
+  return Object.keys(n).sort((a, b) => n[b] - n[a]);
+}
 async function priceStatus(req, env) {
-  const laib = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:laib'").first();
-  const row = await env.DB.prepare("SELECT v FROM kv WHERE k='prices:status'").first();
-  const count = await env.DB.prepare('SELECT chain, COUNT(*) AS n, MAX(ts) AS ts FROM prices GROUP BY chain').all();
-  return json({ status: row ? JSON.parse(row.v) : null, laib: laib ? JSON.parse(laib.v) : null, chains: count.results });
+  const laib = await kvJson(env, 'prices:laib', null);
+  const status = await kvJson(env, 'prices:status', null);
+  const count = await env.DB.prepare('SELECT sid, COUNT(*) AS n, MAX(ts) AS ts FROM sprices GROUP BY sid').all();
+  const branches = await env.DB.prepare('SELECT label, COUNT(*) AS n, SUM(lat IS NOT NULL) AS located FROM branches GROUP BY label').all();
+  const legacy = await env.DB.prepare('SELECT chain, COUNT(*) AS n, MAX(ts) AS ts FROM prices GROUP BY chain').all();
+  return json({ status, laib, stores: count.results, branches: branches.results, chains: legacy.results });
 }
 
 async function postMeals(req, env) {
@@ -330,13 +455,27 @@ async function pushTest(req, env) {
   return json({ ok: true });
 }
 
+// New promotions on the open list join the morning message, each one only once.
+async function withDeals(env, hh, m) {
+  const items = await listItemsOf(env, hh); if (!items.length) return m;
+  const deals = await dealsFor(env, hh, items); if (!deals.length) return m;
+  const key = (d) => d.item + '|' + d.sid + '|' + d.promo;
+  const seen = new Set(await kvJson(env, 'deals-seen:' + hh, []));
+  const fresh = deals.filter((d) => !seen.has(key(d))); if (!fresh.length) return m;
+  await env.DB.prepare('INSERT INTO kv (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('deals-seen:' + hh, JSON.stringify(deals.map(key).slice(0, 200))).run();
+  const text = fresh.length === 1 ? 'מבצע על ' + fresh[0].item + ' ב' + fresh[0].chain + ': ' + fresh[0].promo : fresh.length + ' מבצעים חדשים על מה שברשימה: ' + fresh.slice(0, 3).map((d) => d.item).join(', ');
+  if (m) return Object.assign({}, m, { body: m.body + ' · ' + text });
+  return { title: fresh.length === 1 ? 'מבצע על מה שברשימה' : 'מבצעים על מה שברשימה', body: text, url: '/#deals' };
+}
+
 export async function runReminders(env, now = Date.now()) {
   const { day, hour } = ilNow(now);
   const { results } = await env.DB.prepare('SELECT * FROM push_subs WHERE hour=? AND sent<>?').bind(hour, day).all();
   const stock = {};
   for (const s of results) {
     if (!stock[s.hh]) stock[s.hh] = (await env.DB.prepare("SELECT data FROM rows WHERE hh=? AND kind='item' AND del=0").bind(s.hh).all()).results.map((r) => JSON.parse(r.data));
-    const m = dueText(stock[s.hh], day);
+    let m = dueText(stock[s.hh], day);
+    try { m = await withDeals(env, s.hh, m); } catch { /* deals are a bonus */ }
     await env.DB.prepare('UPDATE push_subs SET sent=?, msg=? WHERE id=?').bind(day, m ? JSON.stringify(m) : '', s.id).run();
     if (m && !(await wake(env, s.endpoint))) await env.DB.prepare('DELETE FROM push_subs WHERE id=?').bind(s.id).run();
   }
@@ -369,6 +508,10 @@ const ROUTES = {
   'GET /api/prices/status': priceStatus,
   'GET /api/prices/probe': priceProbe,
   'POST /api/prices/refresh': priceRefresh,
+  'GET /api/prices/deals': getDeals,
+  'GET /api/stores/near': storesNear,
+  'GET /api/stores/mine': storesMine,
+  'POST /api/stores/mine': setStores,
   'POST /api/photo': postPhoto,
   'POST /api/photo/delete': delPhoto,
   'GET /api/push/key': pushKey,
