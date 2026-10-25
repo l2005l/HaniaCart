@@ -376,8 +376,18 @@ async function priceProbe(req, env) {
     out = { ok: r.ok, status: r.status, files: n, ms: Date.now() - t0, colo };
   } catch (e) { out = { ok: false, error: String(e && e.name || e), ms: Date.now() - t0, colo }; }
   await env.DB.prepare('INSERT INTO kv (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v').bind('probe:' + colo, JSON.stringify(Object.assign({ at: Date.now() }, out))).run();
+  // The same through the Israel relay, for each portal it serves.
+  const relay = {};
+  if (env.IL) {
+    for (const [k, u] of [['laib', 'https://laibcatalog.co.il/webapi/api/getfiles?edi=7290696200003'], ['carrefour', 'https://prices.carrefour.co.il/']]) {
+      const t1 = Date.now();
+      try { const r = await env.IL.fetch('https://haniacart-il/', { headers: { 'x-target': u }, signal: AbortSignal.timeout(25000) }); await r.arrayBuffer(); relay[k] = { status: r.status, colo: r.headers.get('x-il-colo'), ms: Date.now() - t1 }; }
+      catch (e) { relay[k] = { error: String(e && e.name || e), ms: Date.now() - t1 }; }
+    }
+    await env.DB.prepare("INSERT INTO kv (k,v) VALUES ('probe:relay',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(Object.assign({ at: Date.now(), from: colo }, relay))).run();
+  }
   const all = (await env.DB.prepare("SELECT k,v FROM kv WHERE k LIKE 'probe:%'").all()).results.map((r) => JSON.parse(r.v));
-  return json({ this: out, all });
+  return json({ this: out, relay, all });
 }
 // Opening the app asks for this; it runs only when the Laib branches are over 18 hours old,
 // and once at a time. It runs here because the Laib portal answers Cloudflare's Israel location.
