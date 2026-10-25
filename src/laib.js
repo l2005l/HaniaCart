@@ -55,7 +55,17 @@ async function eachBlock(resp, tag, fn) {
   }
 }
 
-const get = (url) => fetch(url, { signal: AbortSignal.timeout(60000), headers: { 'user-agent': 'Mozilla/5.0 HaniaCart (+https://cart.hania360.com)' } });
+// Through the haniacart-il relay (placed in Israel) when it is bound; directly otherwise.
+let RELAY = null;
+export function useRelay(env) { RELAY = env && env.IL ? env.IL : null; }
+export function relayFetch(url, init = {}) {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has('user-agent')) headers.set('user-agent', 'Mozilla/5.0 HaniaCart (+https://cart.hania360.com)');
+  if (!RELAY) return fetch(url, Object.assign({}, init, { headers }));
+  headers.set('x-target', String(url));
+  return RELAY.fetch('https://haniacart-il/', Object.assign({}, init, { headers }));
+}
+const get = (url) => relayFetch(url, { signal: AbortSignal.timeout(60000) });
 
 const sidOf = (slug, id) => slug + ':' + (String(id).replace(/^0+/, '') || '0');
 async function laibFiles(cfg) {
@@ -134,6 +144,7 @@ export async function savePrices(env, sid, rows, ts) {
 
 // Branch lists of the Laib chains, and prices for their default branch and the ones households picked.
 export async function refreshLaib(env, where, wanted = []) {
+  useRelay(env);
   const ts = Date.now(), status = { ts, where, chains: {}, stores: {} }, defaults = [];
   for (const cfg of LAIB) {
     try {
@@ -154,6 +165,7 @@ export async function refreshLaib(env, where, wanted = []) {
       }
     } catch (e) { status.chains[cfg.label] = { ok: false, error: String((e && (e.name + ': ' + e.message)) || e).slice(0, 200) }; }
   }
+  status.ok = Object.values(status.chains).some((c) => c.ok);
   if (defaults.length) await env.DB.prepare("INSERT INTO kv (k,v) VALUES ('prices:laib-defaults',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(defaults)).run();
   await env.DB.prepare("INSERT INTO kv (k,v) VALUES ('prices:laib',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(JSON.stringify(status)).run();
   return status;

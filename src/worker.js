@@ -1,6 +1,6 @@
 import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
 import { gtin14 } from './gtin.js';
-import { refreshLaib, LAIB_SLUGS } from './laib.js';
+import { refreshLaib, LAIB_SLUGS, useRelay, relayFetch } from './laib.js';
 import { getAccount, linkAccount, unlinkAccount, accountSummary, summaryPreflight, accountListAdd, listAddPreflight } from './account.js';
 export { gtin14 };
 // HaniaCart API. A household is a long random key both phones keep (sent as x-hh). Accounts are optional:
@@ -383,20 +383,36 @@ async function priceProbe(req, env) {
 // and once at a time. It runs here because the Laib portal answers Cloudflare's Israel location.
 async function priceRefresh(req, env) {
   if (!hhKey(req)) return bad('household');
-  const now = Date.now(), colo = (req.cf && req.cf.colo) || '';
-  if (req.cf && req.cf.country && req.cf.country !== 'IL') return json({ ran: false, reason: 'outside Israel' });
+  const colo = (req.cf && req.cf.colo) || '';
+  // Without the Israel relay only a visitor routed through Tel Aviv can reach the portal.
+  if (!env.IL && req.cf && req.cf.country && req.cf.country !== 'IL') return json({ ran: false, reason: 'outside Israel' });
+  return json(await maybeRefreshLaib(env, env.IL ? 'relay' : colo));
+}
+// Runs the Laib refresh when its branches are stale, once at a time. Called by the app and by the hourly cron.
+export async function maybeRefreshLaib(env, where) {
+  const now = Date.now();
   const st = await kvJson(env, 'prices:laib', null);
   const wanted = await laibWanted(env);
   const done = st && st.stores ? Object.keys(st.stores) : [];
   const fresh = st && Object.values(st.chains || {}).every((c) => c.ok) && wanted.every((s) => done.includes(s)) && now - st.ts < 18 * 3600e3;
   const recentTry = st && now - st.ts < 3 * 3600e3 && wanted.every((s) => done.includes(s));
-  if (fresh || recentTry) return json({ ran: false, status: st });
+  if (fresh || (recentTry && st.ok !== false)) return { ran: false, status: st };
   const lock = await env.DB.prepare("SELECT v FROM kv WHERE k='laib:lock'").first();
-  if (lock && now - +lock.v < 10 * 60e3) return json({ ran: false, busy: true });
+  if (lock && now - +lock.v < 10 * 60e3) return { ran: false, busy: true };
   await env.DB.prepare("INSERT INTO kv (k,v) VALUES ('laib:lock',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").bind(String(now)).run();
-  const status = await refreshLaib(env, colo, wanted);
-  await env.DB.prepare("DELETE FROM kv WHERE k='laib:lock'").run();
-  return json({ ran: true, status });
+  try { return { ran: true, status: await refreshLaib(env, where, wanted) }; }
+  finally { await env.DB.prepare("DELETE FROM kv WHERE k='laib:lock'").run(); }
+}
+// The nightly GitHub job sends Carrefour's requests here; they go out through the Israel relay.
+// The job writes a fresh token to kv before it starts.
+async function ilFetch(req, env) {
+  const tok = await kvJson(env, 'il:token', null), given = req.headers.get('x-il-token') || '';
+  if (!tok || !given || given !== tok.v || Date.now() - tok.ts > 4 * 3600e3) return bad('forbidden', 403);
+  const target = req.headers.get('x-target') || '';
+  useRelay(env);
+  const headers = {}; for (const [k, v] of req.headers) if (!/^(x-target|x-il-token|host|cf-|x-forwarded|content-length)/i.test(k)) headers[k] = v;
+  const r = await relayFetch(target, { method: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : await req.arrayBuffer() });
+  return new Response(r.body, r);
 }
 // Laib branches some household picked, most wanted first.
 async function laibWanted(env) {
@@ -513,6 +529,8 @@ const ROUTES = {
   'GET /api/stores/mine': storesMine,
   'POST /api/stores/mine': setStores,
   'POST /api/photo': postPhoto,
+  'GET /api/il-fetch': ilFetch,
+  'POST /api/il-fetch': ilFetch,
   'POST /api/photo/delete': delPhoto,
   'GET /api/push/key': pushKey,
   'POST /api/push/sub': pushSub,
@@ -526,6 +544,8 @@ export default {
     ctx.waitUntil((async () => {
       await runReminders(env);
       if (ilNow().hour === 3) await cleanup(env);
+      // Victory, Hyper Cohen, Mahsanei HaShuk: through the Israel relay, no need to wait for someone to open the app.
+      if (env.IL) { try { await maybeRefreshLaib(env, 'cron'); } catch {} }
     })());
   },
   async fetch(req, env) {

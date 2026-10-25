@@ -33,4 +33,6 @@ jobs:
           test -n "$id"
           sed -i "s/REPLACED_BY_DEPLOY/$id/" wrangler.jsonc
       - run: npx wrangler d1 migrations apply haniacart --remote
+      - name: Deploy the Israel relay first (the main Worker binds to it)
+        run: npx wrangler deploy -c il/wrangler.jsonc
       - run: npx wrangler deploy

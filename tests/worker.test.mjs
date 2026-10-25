@@ -192,6 +192,37 @@ test('Victory and Hyper Cohen are read from the Laib portal when the app asks', 
   } finally { globalThis.fetch = orig; }
 });
 
+test('the Laib refresh goes through the Israel relay, and the cron runs it', async () => {
+  const { gzipSync } = await import('node:zlib');
+  const stores = gzipSync(Buffer.from('<Root><Stores><Store><StoreId>92</StoreId><StoreName>נתיבות</StoreName><City>נתיבות</City></Store></Stores></Root>'));
+  const price = gzipSync(Buffer.from('<root><Items><Item><ItemCode>7290000000015</ItemCode><ItemName>קמח</ItemName><ItemPrice>9.9</ItemPrice></Item></Items></root>'));
+  const seen = [];
+  const IL = { fetch: async (u, init) => {
+    const t = new Headers(init.headers).get('x-target'); seen.push(t);
+    if (t.includes('getfiles')) return new Response(JSON.stringify([{ fileName: 'Stores1.xml.gz', fileDate: '1' }, { fileName: 'PriceFull1-001-092-x.gz', branchNumber: '092', fileDate: '1' }]));
+    if (t.includes('Stores')) return new Response(stores);
+    return new Response(price);
+  } };
+  const env = { DB: fakeD1(), IL };
+  const orig = globalThis.fetch; globalThis.fetch = async () => { throw new Error('must not fetch directly'); };
+  try {
+    await worker.scheduled({}, env, { waitUntil: (p) => p });
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(seen.length >= 3, 'all requests went through the relay');
+    assert.ok(env.DB.raw.prepare("SELECT COUNT(*) AS c FROM branches WHERE chain='victory'").get().c >= 1);
+    assert.equal(env.DB.raw.prepare("SELECT price FROM sprices WHERE sid='victory:92'").get().price, 9.9);
+  } finally { globalThis.fetch = orig; }
+});
+
+test('il-fetch needs the token the nightly job wrote', async () => {
+  const env = { DB: fakeD1(), IL: { fetch: async (u, init) => new Response('ok:' + new Headers(init.headers).get('x-target')) } };
+  const req = (tok) => worker.fetch(new Request('https://cart.test/api/il-fetch', { headers: { 'x-il-token': tok, 'x-target': 'https://prices.carrefour.co.il/' } }), env);
+  assert.equal((await req('x')).status, 403);
+  env.DB.raw.prepare("INSERT INTO kv (k,v) VALUES ('il:token', ?)").run(JSON.stringify({ v: 'secret123', ts: Date.now() }));
+  assert.equal((await req('nope')).status, 403);
+  const r = await req('secret123'); assert.equal(r.status, 200); assert.equal(await r.text(), 'ok:https://prices.carrefour.co.il/');
+});
+
 test('looseJson finds the object inside prose', () => {
   assert.deepEqual(looseJson('הנה: {"a":1} תודה'), { a: 1 });
   assert.equal(looseJson('nothing'), null);
@@ -266,7 +297,7 @@ test('a household that is cleaned up also leaves the accounts', async () => {
 test('production talks to Hania Pass; staging to Hania Pass staging', () => {
   const cfg = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   const parsed = JSON.parse(cfg.replace(/^\s*\/\/.*$/gm, ''));
-  assert.deepEqual(parsed.services, [{ binding: 'PASS', service: 'hania-pass' }]);
+  assert.deepEqual(parsed.services, [{ binding: 'PASS', service: 'hania-pass' }, { binding: 'IL', service: 'haniacart-il' }]);
   assert.deepEqual(parsed.env.staging.services, [{ binding: 'PASS', service: 'hania-pass-staging' }]);
   assert.equal(parsed.env.staging.d1_databases[0].database_name, 'haniacart-staging');
   assert.deepEqual(parsed.env.staging.triggers.crons, []);

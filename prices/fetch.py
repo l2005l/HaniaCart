@@ -32,6 +32,26 @@ BATCH = 400
 LAIB = {"victory", "het-cohen", "mahsanei-hashuk"}  # loaded by the Worker
 MAX_WANTED = 80  # branches downloaded per night
 UA = {"User-Agent": "HaniaCart/1.0 (+https://cart.hania360.com)"}
+RELAYED = {"prices.carrefour.co.il"}  # times out from GitHub; goes through the Worker's Israel relay
+
+
+def use_relay(proxy, token, hosts=RELAYED):
+    """Send the price library's requests to `hosts` through the Worker's /api/il-fetch."""
+    from urllib.parse import urlencode, urlsplit
+    from israeli_prices.core import http as ilhttp
+
+    original = ilhttp.HttpClient._request
+
+    def request(self, method, url, **kw):
+        if urlsplit(url).hostname not in hosts:
+            return original(self, method, url, **kw)
+        params = kw.pop("params", None)
+        target = url + (("&" if "?" in url else "?") + urlencode(params) if params else "")
+        kw["headers"] = {"x-target": target, "x-il-token": token}
+        self._client.timeout = 120.0
+        return original(self, method, proxy, **kw)
+
+    ilhttp.HttpClient._request = request
 
 
 def q(v):
@@ -297,6 +317,9 @@ def d1_results(path):
 
 
 if __name__ == "__main__":
+    import os
+    if os.environ.get("IL_PROXY") and os.environ.get("IL_TOKEN"):
+        use_relay(os.environ["IL_PROXY"], os.environ["IL_TOKEN"])
     import israeli_prices as ilp
 
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "prices.sql")

@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "haniacart-il",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-30",
+  "workers_dev": false,
+  // Run next to AWS Tel Aviv: the chain portals time out from GitHub and from European data centers.
+  "placement": { "region": "aws:il-central-1" }
+}
