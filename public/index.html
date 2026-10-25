@@ -498,9 +498,10 @@ var HH = ls('hc.hh');
 if (!HH || !/^[A-Za-z0-9_-]{24,48}$/.test(HH)) { HH = Array.from(crypto.getRandomValues(new Uint8Array(24)), function (x) { return 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789_-'[x % 62]; }).join(''); ls('hc.hh', HH); }
 var ME = ls('hc.name') || '';
 var S = {}; KINDS.forEach(function (k) { S[k] = {}; });
-var since = +(ls('hc.since') || 0), outbox = [], online = true;
+// "since" belongs to one household: a value saved for another (or in the old plain format) means a full sync.
+var since = (function (v) { var m = String(v || '').match(/^([A-Za-z0-9_-]{24,48}):(\d+)$/); return m && m[1] === HH ? +m[2] : 0; })(ls('hc.since')), outbox = [], online = true;
 try { var cached = JSON.parse(ls('hc.cache') || 'null'); if (cached) KINDS.forEach(function (k) { S[k] = cached[k] || {}; }); outbox = JSON.parse(ls('hc.out') || '[]'); } catch (e) {}
-function save() { ls('hc.cache', JSON.stringify(S)); ls('hc.out', JSON.stringify(outbox)); ls('hc.since', String(since)); }
+function save() { ls('hc.cache', JSON.stringify(S)); ls('hc.out', JSON.stringify(outbox)); ls('hc.since', HH + ':' + since); }
 function all(kind) { return Object.keys(S[kind]).map(function (id) { return Object.assign({ id: id }, S[kind][id]); }); }
 
 function api(method, path, body) {
@@ -541,13 +542,16 @@ var pulling = false;
 function pull() {
   if (pulling || flushing) return;
   pulling = true;
+  var hk = HH;
   api('GET', '/api/sync?since=' + since).then(function (j) {
     pulling = false; online = true;
+    // The household changed while this was on its way (joining from a link): drop it and fetch the new one.
+    if (hk !== HH) { pull(); return; }
     var pending = {}; outbox.forEach(function (o) { pending[o.kind + ':' + o.id] = 1; });
     if (j.full) KINDS.forEach(function (k) { Object.keys(S[k]).forEach(function (id) { if (!pending[k + ':' + id]) delete S[k][id]; }); });
     j.rows.forEach(function (r) { if (!S[r.kind] || pending[r.kind + ':' + r.id]) return; if (r.del) delete S[r.kind][r.id]; else S[r.kind][r.id] = r.data; });
     since = j.now; save(); render();
-  }, function (e) { pulling = false; online = e.code !== 'offline'; renderSummary(); });
+  }, function (e) { pulling = false; online = e.code !== 'offline'; renderSummary(); if (hk !== HH) pull(); });
 }
 setInterval(function () { if (document.visibilityState === 'visible') { if (outbox.length) flush(); else pull(); } }, 8000);
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { flush(); pull(); } });
@@ -1467,7 +1471,7 @@ if (jm) setTimeout(function () { tryJoin(jm[1]); }, 50);
 // Back from signing in to Hania360: reopen settings on the account card.
 if (hash === 'settings') setTimeout(function () { history.replaceState(null, '', location.pathname + location.search); $('openSettings').click(); }, 50);
 else if (!jm) accLoad();
-window.addEventListener('hashchange', function () { var t = location.hash.slice(1); if (t !== tab && ['stock', 'list', 'meals', 'scan', 'stats'].indexOf(t) >= 0) setTab(t); });
+window.addEventListener('hashchange', function () { var t = location.hash.slice(1), jj = t.match(/^join=([A-Za-z0-9_-]{24,48})$/); if (jj) { setTab('list'); tryJoin(jj[1]); return; } if (t !== tab && ['stock', 'list', 'meals', 'scan', 'stats'].indexOf(t) >= 0) setTab(t); });
 // Text shared from another app (a WhatsApp message) arrives as ?sx=… and can go straight onto the list.
 var qs = new URLSearchParams(location.search), shared = [qs.get('st'), qs.get('sx'), qs.get('su')].filter(Boolean).join('\n');
 if (shared) {
