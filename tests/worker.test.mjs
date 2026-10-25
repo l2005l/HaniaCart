@@ -297,7 +297,7 @@ test('a household that is cleaned up also leaves the accounts', async () => {
 test('production talks to Hania Pass; staging to Hania Pass staging', () => {
   const cfg = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
   const parsed = JSON.parse(cfg.replace(/^\s*\/\/.*$/gm, ''));
-  assert.deepEqual(parsed.services, [{ binding: 'PASS', service: 'hania-pass' }, { binding: 'IL', service: 'haniacart-il' }]);
+  assert.deepEqual(parsed.services, [{ binding: 'PASS', service: 'hania-pass' }]);
   assert.deepEqual(parsed.env.staging.services, [{ binding: 'PASS', service: 'hania-pass-staging' }]);
   assert.equal(parsed.env.staging.d1_databases[0].database_name, 'haniacart-staging');
   assert.deepEqual(parsed.env.staging.triggers.crons, []);

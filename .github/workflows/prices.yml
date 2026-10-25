@@ -27,18 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install 'israeli-prices==0.2.*'
-      - name: A one-night token for the Israel relay (Carrefour answers only from Israel)
-        run: |
-          tok=$(openssl rand -hex 24)
-          echo "::add-mask::$tok"
-          echo "IL_TOKEN=$tok" >> "$GITHUB_ENV"
-          npx wrangler d1 execute haniacart --remote --command "INSERT INTO kv (k,v) VALUES ('il:token', json_object('v','$tok','ts',CAST(strftime('%s','now') AS INTEGER)*1000)) ON CONFLICT(k) DO UPDATE SET v=excluded.v"
       - name: Download branches and price files
-        env:
-          IL_PROXY: https://cart.hania360.com/api/il-fetch
         run: python prices/fetch.py prices.sql wanted.json places.json
       - name: Load the prices
         run: npx wrangler d1 execute haniacart --remote --file prices.sql -y
-      - name: Refresh Victory, Hyper Cohen and Mahsanei HaShuk through the Israel relay
-        run: |
-          curl -sS -m 600 -X POST https://cart.hania360.com/api/prices/refresh -H "x-hh: nightly-job-refresh-000000000" -H 'content-type: application/json' -d '{}' | head -c 2000
