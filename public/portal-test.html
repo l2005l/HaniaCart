@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>בדיקת גישה לרשתות</title>
+<style>body{font:16px system-ui,sans-serif;margin:16px;line-height:1.5}pre{white-space:pre-wrap;background:#f2f4f3;padding:12px;border-radius:10px;direction:ltr;text-align:left}</style></head>
+<body>
+<h1>בדיקת גישה לרשתות</h1>
+<p>הדף בודק אם הטלפון יכול להוריד ישירות את קובצי המחירים של ויקטורי, היפר כהן וקרפור. מצלמים את התוצאה ושולחים.</p>
+<pre id="out">בודק…</pre>
+<script>
+var tests = [
+  ['victory-list', 'https://laibcatalog.co.il/webapi/api/getfiles?edi=7290696200003'],
+  ['carrefour-home', 'https://prices.carrefour.co.il/'],
+];
+var out = [];
+function show() { document.getElementById('out').textContent = out.join('\n'); }
+(async function () {
+  for (var i = 0; i < tests.length; i++) {
+    var t = tests[i], t0 = Date.now();
+    try {
+      var r = await fetch(t[1], { signal: AbortSignal.timeout(20000) });
+      var text = await r.text();
+      var n = null; try { n = JSON.parse(text).length; } catch (e) {}
+      out.push(t[0] + ': READ status=' + r.status + ' bytes=' + text.length + (n != null ? ' files=' + n : '') + ' ms=' + (Date.now() - t0));
+    } catch (e) {
+      // Without CORS the read fails; a no-cors request tells us whether the site answered at all.
+      var t1 = Date.now(), reach = '';
+      try { await fetch(t[1], { mode: 'no-cors', signal: AbortSignal.timeout(20000) }); reach = 'reachable'; } catch (e2) { reach = 'unreachable ' + e2.name; }
+      out.push(t[0] + ': BLOCKED ' + e.name + ' (' + reach + ', ms=' + (Date.now() - t1) + ')');
+    }
+    show();
+  }
+  out.push('done'); show();
+})();
+</script>
+</body></html>
