@@ -394,8 +394,9 @@ async function priceProbe(req, env) {
 async function priceRefresh(req, env) {
   if (!hhKey(req)) return bad('household');
   const colo = (req.cf && req.cf.colo) || '';
-  // Without the Israel relay only a visitor routed through Tel Aviv can reach the portal.
-  if (!env.IL && req.cf && req.cf.country && req.cf.country !== 'IL') return json({ ran: false, reason: 'outside Israel' });
+  // The portal answers only Cloudflare's Tel Aviv data center. Phones on mobile data usually go
+  // through it; home Wi-Fi often goes through London, where a try only wastes a minute.
+  if (!env.IL && req.cf && colo !== 'TLV') return json({ ran: false, reason: 'not through Tel Aviv', colo });
   return json(await maybeRefreshLaib(env, env.IL ? 'relay' : colo));
 }
 // Runs the Laib refresh when its branches are stale, once at a time. Called by the app and by the hourly cron.
