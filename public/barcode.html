@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Barcode · HaniaCart</title>
+<meta name="description" content="מצלמים ברקוד בסופר ורואים מיד כמה המוצר עולה בכל הסניפים הקרובים, ואם יש עליו מבצע. בחינם, בלי הרשמה.">
+<link rel="canonical" href="https://cart.hania360.com/barcode">
+<meta name="theme-color" content="#0B1410">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<style>
+/* Layout: a viewfinder on top, the price card sliding up from the bottom. Dark, like a camera app. */
+:root{
+  --night:#0B1410; --panel:#14211B; --ink:#EAF4EE; --muted:#96AE9F; --line:#24382E; --brand:#56C48F; --brand-deep:#1E7A52; --warn:#FFB547; --sale:#FF6B5E; --card:#FFFFFF; --card-ink:#13261C;
+  --font:"Rubik",system-ui,-apple-system,"Segoe UI","Arial Hebrew",sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--night);color:var(--ink);font-family:var(--font)}
+body{display:flex;flex-direction:column;overflow:hidden}
+.top{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+.top a{color:var(--muted);text-decoration:none;font-weight:700;font-size:15px}
+.top b{font-size:20px;font-weight:800}
+.top b span{color:var(--brand)}
+.top .stores{margin-inline-start:auto;appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:6px 12px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;max-width:55vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.view{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.frame{position:absolute;left:50%;top:42%;width:min(78vw,340px);height:min(40vw,170px);transform:translate(-50%,-50%);border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.45)}
+.frame::before,.frame::after{content:"";position:absolute;inset:0;border-radius:18px;border:3px solid var(--brand)}
+.frame::after{border:0;height:2px;top:50%;background:linear-gradient(90deg,transparent,var(--sale),transparent);animation:scan 1.8s ease-in-out infinite}
+@keyframes scan{0%,100%{transform:translateY(-60px)}50%{transform:translateY(60px)}}
+.hint{position:absolute;left:0;right:0;top:calc(42% + min(20vw,85px) + 18px);text-align:center;font-weight:700;font-size:17px;text-shadow:0 1px 6px #000}
+.start{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;align-content:center;gap:16px;text-align:center;padding:24px;background:radial-gradient(70% 50% at 50% 40%,#1B3427,var(--night))}
+.start h1{margin:0;font-size:clamp(28px,8vw,40px);line-height:1.15;font-weight:800;text-wrap:balance}
+.start>*{max-width:100%}.start p{margin:0;color:var(--muted);font-size:17px;max-width:420px;line-height:1.5}
+.btn{appearance:none;border:0;border-radius:999px;background:var(--brand);color:#06200F;font:inherit;font-weight:800;font-size:20px;padding:16px 28px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line);font-size:16px;padding:10px 16px}
+.btn:focus-visible{outline:3px solid var(--warn);outline-offset:3px}
+.manual{display:flex;gap:8px;width:min(100%,380px)}
+.manual input{flex:1;min-width:0;font:inherit;font-size:18px;letter-spacing:.06em;direction:ltr;text-align:center;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:14px;padding:11px}
+/* result */
+.sheet{position:absolute;z-index:5;left:0;right:0;bottom:0;max-height:78%;overflow-y:auto;background:var(--card);color:var(--card-ink);border-radius:24px 24px 0 0;padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:12px;box-shadow:0 -20px 50px rgba(0,0,0,.45);animation:up .28s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet h2{margin:0;font-size:21px;line-height:1.3;font-weight:800;text-wrap:balance}
+.code{color:#6D8577;font-size:13px;direction:ltr;text-align:right}
+.best{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;padding:14px;border-radius:18px;background:#E2F1E8}
+.best .lab{grid-column:1/-1;font-size:13px;font-weight:800;color:var(--brand-deep)}
+.best b{font-size:20px}
+.best .p{font-size:34px;font-weight:900;color:var(--brand-deep);font-variant-numeric:tabular-nums}
+.best small{grid-column:1/-1;color:#4B6356}
+.save{font-weight:800;color:var(--brand-deep)}
+.rows{display:grid;gap:0;border:1px solid #DCE7E0;border-radius:16px;overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 12px;border-top:1px solid #E6EEE9;align-items:center}
+.row:first-child{border-top:0}
+.row b{font-size:16px}
+.row .pr{font-weight:800;font-size:18px;font-variant-numeric:tabular-nums;text-align:left}
+.row small{color:#5B6F63}
+.promo{display:inline-block;font-size:12.5px;font-weight:800;color:#fff;background:var(--sale);border-radius:7px;padding:1px 7px;margin-inline-start:6px}
+.was{color:#8DA197;text-decoration:line-through;font-size:13px;margin-inline-end:6px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acts .btn{font-size:17px;padding:13px}
+.acts .ghost{color:var(--card-ink);border-color:#CFDDD4}
+.empty{padding:14px;border-radius:16px;background:#FFF4E0;color:#6B4A00;line-height:1.5}
+.recent{display:flex;gap:6px;flex-wrap:wrap}
+.recent button{appearance:none;border:1px solid #DCE7E0;background:#F4F8F5;color:var(--card-ink);border-radius:99px;padding:5px 10px;font:inherit;font-size:13.5px;cursor:pointer}
+.toast{position:fixed;left:50%;top:calc(60px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--ink);color:var(--night);padding:10px 16px;border-radius:12px;font-weight:700;z-index:40;max-width:90%}
+@media (prefers-reduced-motion:reduce){.frame::after{animation:none}.sheet{animation:none}}
+</style>
+</head>
+<body>
+<div class="top"><a href="/" aria-label="חזרה ל־HaniaCart">→ HaniaCart</a><b>Bar<span>code</span></b><button class="stores" type="button" id="storesBtn">📍 הסניפים</button></div>
+<div class="view" id="view">
+  <video id="video" playsinline muted autoplay></video>
+  <div class="frame" id="frame" hidden></div>
+  <div class="hint" id="hint" hidden>מכוונים את הברקוד למסגרת</div>
+  <div class="start" id="start">
+    <h1>כמה זה עולה בסניף ממול?</h1>
+    <p>מכוונים את המצלמה לברקוד של מוצר, ורואים מיד את המחיר בכל הסניפים הקרובים ואם יש עליו מבצע.</p>
+    <button class="btn" type="button" id="go">📷 לפתוח מצלמה</button>
+    <form class="manual" id="manual"><input id="manualIn" inputmode="numeric" maxlength="14" placeholder="או מקלידים את הספרות" aria-label="מספר הברקוד"><button class="btn ghost" type="submit">חיפוש</button></form>
+    <p id="camErr" hidden></p>
+  </div>
+  <div class="sheet" id="sheet" hidden></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  // The same household as the HaniaCart app on this phone, so it compares the same branches.
+  var HH = ls("hc.hh");
+  if (!HH || !/^[A-Za-z0-9_-]{24,48}$/.test(HH)) { HH = Array.from(crypto.getRandomValues(new Uint8Array(24)), function (x) { return "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789_-"[x % 62]; }).join(""); ls("hc.hh", HH); }
+  function api(method, path, body) { return fetch(path, { method: method, headers: Object.assign({ "x-hh": HH }, body ? { "content-type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined }).then(function (r) { return r.json(); }); }
+  function el(t, a, kids) { var e = document.createElement(t); Object.keys(a || {}).forEach(function (k) { if (k.slice(0, 2) === "on") e.addEventListener(k.slice(2), a[k]); else if (k === "text") e.textContent = a[k]; else e.setAttribute(k, a[k]); }); (kids || []).forEach(function (c) { if (c != null) e.append(typeof c === "string" ? document.createTextNode(c) : c); }); return e; }
+  function toast(t) { var x = el("div", { class: "toast", text: t }); document.body.append(x); setTimeout(function () { x.remove(); }, 2400); }
+  var fmt = function (n) { return "₪" + (+n).toFixed(2).replace(/\.00$/, ""); };
+  var gtin14 = function (v) { var d = String(v == null ? "" : v).replace(/\D/g, ""); return d.length >= 8 && d.length <= 14 ? ("00000000000000" + d).slice(-14) : ""; };
+  var eff = function (p) { return p.pprice || p.price; };
+
+  // ---- branches -----------------------------------------------------------------------
+  var mine = null;
+  function loadMine() { return api("GET", "/api/stores/mine").then(function (j) { mine = j; $("storesBtn").textContent = "📍 " + (j.mine ? j.branches.length + " סניפים שלך" : "סניפי ברירת מחדל"); }).catch(function () {}); }
+  $("storesBtn").addEventListener("click", function () { location.href = "/#stores"; });
+
+  // ---- camera ------------------------------------------------------------------------
+  var stream = null, detector = null, zx = null, busy = false, lastCode = "", lastAt = 0;
+  function startCam() {
+    $("camErr").hidden = true;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (s) {
+      stream = s; $("video").srcObject = s; $("start").hidden = true; $("frame").hidden = false; $("hint").hidden = false;
+      if ("BarcodeDetector" in window) {
+        detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
+        loop();
+      } else loadZxing();
+    }).catch(function () { $("camErr").hidden = false; $("camErr").textContent = "אין גישה למצלמה. מאשרים מצלמה בהגדרות הדפדפן, או מקלידים את הספרות שמתחת לברקוד."; });
+  }
+  function loop() {
+    if (!stream) return;
+    if (!busy && $("sheet").hidden && $("video").readyState >= 2) {
+      busy = true;
+      detector.detect($("video")).then(function (codes) { busy = false; if (codes && codes[0]) found(codes[0].rawValue); }).catch(function () { busy = false; });
+    }
+    setTimeout(loop, 180);
+  }
+  // iPhone has no BarcodeDetector: ZXing reads the video instead.
+  function loadZxing() {
+    var s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+    s.onload = function () {
+      var Z = window.ZXing, hints = new Map();
+      hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E]);
+      zx = new Z.BrowserMultiFormatReader(hints, 200);
+      zx.decodeFromStream(stream, $("video"), function (res) { if (res && $("sheet").hidden) found(res.getText()); });
+    };
+    s.onerror = function () { $("hint").textContent = "לא הצלחנו לטעון את קורא הברקוד. מקלידים את הספרות."; };
+    document.head.append(s);
+  }
+  $("go").addEventListener("click", startCam);
+  $("manual").addEventListener("submit", function (e) { e.preventDefault(); var v = $("manualIn").value; if (gtin14(v)) found(v); else toast("ברקוד הוא 8 עד 13 ספרות"); });
+  $("manualIn").addEventListener("input", function (e) { e.target.value = e.target.value.replace(/\D/g, ""); });
+
+  // ---- a code was read ------------------------------------------------------------------
+  function found(raw) {
+    var code = gtin14(raw); if (!code) return;
+    if (code === lastCode && Date.now() - lastAt < 4000) return;
+    lastCode = code; lastAt = Date.now();
+    try { navigator.vibrate && navigator.vibrate(40); } catch (e) {}
+    var sh = $("sheet"); sh.hidden = false; $("start").hidden = true; sh.replaceChildren(el("h2", { text: "מחפש מחיר…" }), el("div", { class: "code", text: code.replace(/^0+/, "") }));
+    api("GET", "/api/prices?codes=" + code).then(function (j) { show(code, (j.prices && j.prices[code]) || []); }).catch(function () { sh.replaceChildren(el("h2", { text: "אין חיבור כרגע" }), actions(code, "")); });
+  }
+  function show(code, rows) {
+    var sh = $("sheet");
+    if (!rows.length) {
+      sh.replaceChildren(el("h2", { text: "המוצר לא נמצא בסניפים שלך" }), el("div", { class: "code", text: code.replace(/^0+/, "") }),
+        el("div", { class: "empty", text: "אולי זה מוצר בשקילה או של מותג פרטי של רשת אחרת. אפשר לבחור עוד סניפים קרובים, או להוסיף אותו לרשימה בכל זאת." }), actions(code, ""));
+      return;
+    }
+    rows = rows.slice().sort(function (a, b) { return eff(a) - eff(b); });
+    var best = rows[0], worst = rows[rows.length - 1], name = best.name;
+    remember(code, name, eff(best));
+    var kids = [el("h2", { text: name }), el("div", { class: "code", text: code.replace(/^0+/, "") + (best.unit ? " · " + best.unit : "") })];
+    kids.push(el("div", { class: "best" }, [el("span", { class: "lab", text: rows.length > 1 ? "🏆 הכי זול כרגע" : "המחיר" }), el("b", { text: best.chain }), el("span"), el("span", { class: "p", text: fmt(eff(best)) }),
+      el("small", {}, [best.store || "", best.promo ? el("span", { class: "promo", text: best.promo }) : null, best.pprice ? " · במבצע, במקום " + fmt(best.price) : ""])]));
+    if (rows.length > 1 && eff(worst) > eff(best) * 1.01) kids.push(el("div", { class: "save", text: "חיסכון של " + fmt(eff(worst) - eff(best)) + " לעומת " + worst.chain + " (" + Math.round((1 - eff(best) / eff(worst)) * 100) + "%)" }));
+    kids.push(el("div", { class: "rows" }, rows.map(function (r, i) {
+      return el("div", { class: "row" }, [el("b", {}, [r.chain, r.promo ? el("span", { class: "promo", text: r.promo }) : null]), el("span", { class: "pr" }, [r.pprice ? el("span", { class: "was", text: fmt(r.price) }) : null, fmt(eff(r))]), el("small", { text: r.store || "" })]);
+    })));
+    kids.push(actions(code, name));
+    kids.push(recentEl());
+    sh.replaceChildren.apply(sh, kids.filter(Boolean));
+  }
+  function actions(code, name) {
+    return el("div", { class: "acts" }, [
+      el("button", { class: "btn", type: "button", text: "➕ לרשימת הקניות", onclick: function (e) { addToList(code, name, e.currentTarget); } }),
+      el("button", { class: "btn ghost", type: "button", text: "📷 לסרוק עוד", onclick: next })]);
+  }
+  function next() { $("sheet").hidden = true; lastCode = ""; if (!stream) { $("start").hidden = false; } }
+  function uid() { return Array.from(crypto.getRandomValues(new Uint8Array(9)), function (x) { return "abcdefghijkmnopqrstuvwxyz23456789"[x % 33]; }).join(""); }
+  function addToList(code, name, btn) {
+    var n = (name || "מוצר " + code.replace(/^0+/, "").slice(-6)).slice(0, 80);
+    btn.disabled = true;
+    // The list item, and the product with its barcode so HaniaCart shows its prices.
+    var same = function (a) { return String(a || "").trim().toLowerCase() === n.trim().toLowerCase(); };
+    api("GET", "/api/sync").then(function (s) {
+      var rows = (s && s.rows) || [], ops = [];
+      var open = rows.filter(function (r) { return r.kind === "list" && r.data && !r.data.done && same(r.data.name); })[0];
+      if (open) ops.push({ kind: "list", id: open.id, data: Object.assign({}, open.data, { qty: Math.min(99, (open.data.qty || 1) + 1) }) });
+      else ops.push({ kind: "list", id: uid(), data: { name: n, qty: 1, cat: "other", added: Date.now(), by: ls("hc.name") || "" } });
+      // Kept once with its barcode, so HaniaCart shows its prices and deals.
+      if (!rows.some(function (r) { return r.kind === "fav" && r.data && (r.data.code === code || same(r.data.name)); })) ops.push({ kind: "fav", id: uid(), data: { name: n, cat: "other", code: code, added: Date.now() } });
+      return api("POST", "/api/sync", { ops: ops });
+    })
+      .then(function () { btn.textContent = "✓ נוסף לרשימה"; toast(n + " נוסף לרשימה ב־HaniaCart"); })
+      .catch(function () { btn.disabled = false; toast("לא הצלחנו להוסיף. בודקים אינטרנט."); });
+  }
+  // ---- recent scans ------------------------------------------------------------------------
+  function remember(code, name, price) { var r = []; try { r = JSON.parse(ls("hc.scans") || "[]"); } catch (e) {} r = r.filter(function (x) { return x.c !== code; }); r.unshift({ c: code, n: name, p: price }); ls("hc.scans", JSON.stringify(r.slice(0, 12))); }
+  function recentEl() {
+    var r = []; try { r = JSON.parse(ls("hc.scans") || "[]"); } catch (e) {}
+    if (r.length < 2) return null;
+    return el("div", {}, [el("small", { text: "נסרקו לאחרונה", style: "color:#5B6F63;font-weight:700" }), el("div", { class: "recent" }, r.slice(1, 8).map(function (x) { return el("button", { type: "button", text: x.n.slice(0, 22) + " · " + fmt(x.p), onclick: function () { lastCode = ""; found(x.c); } }); }))]);
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden && stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; if (zx) try { zx.reset(); } catch (e) {} $("start").hidden = false; $("frame").hidden = true; $("hint").hidden = true; } });
+  loadMine();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});
+})();
+</script>
+</body>
+</html>
