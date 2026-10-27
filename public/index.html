@@ -221,6 +221,9 @@ dialog form.addrow{flex-direction:row;gap:8px}
       <label class="pick"><input type="file" accept="image/*" capture="environment" id="fReceipt">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>
         <b>צילום חשבונית</b><span>המוצרים נכנסים למלאי עם מחירים, יורדים מרשימת הקניות, והסכום נרשם בסיכום</span></label>
+      <a class="pick" href="/barcode" style="text-decoration:none;color:inherit">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5v14M7 5v14M11 5v14M14 5v14M17 5v14M20 5v14"/></svg>
+        <b>Barcode: כמה זה עולה בסניף ממול</b><span>מכוונים לברקוד ורואים את המחיר בכל הסניפים הקרובים, ואם יש עליו מבצע</span></a>
       <label class="pick"><input type="file" accept="image/*" capture="environment" id="fShelf">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M5 10h14M8 6v1M8 13v3"/></svg>
         <b>צילום מקרר, מקפיא או ארון</b><span>מזהה מה שנראה בתמונה ומוסיף רק מה שעוד לא רשום</span></label>
@@ -1469,6 +1472,7 @@ var hash = location.hash.slice(1), jm = hash.match(/^join=([A-Za-z0-9_-]{24,48})
 setTab(jm ? 'list' : (['stock', 'list', 'meals', 'scan', 'stats'].indexOf(hash) >= 0 ? hash : ls('hc.tab') || 'stock'));
 if (jm) setTimeout(function () { tryJoin(jm[1]); }, 50);
 // Back from signing in to Hania360: reopen settings on the account card.
+if (hash === 'stores') setTimeout(function () { history.replaceState(null, '', location.pathname); openStores(); }, 80);
 if (hash === 'settings') setTimeout(function () { history.replaceState(null, '', location.pathname + location.search); $('openSettings').click(); }, 50);
 else if (!jm) accLoad();
 window.addEventListener('hashchange', function () { var t = location.hash.slice(1), jj = t.match(/^join=([A-Za-z0-9_-]{24,48})$/); if (jj) { setTab('list'); tryJoin(jj[1]); return; } if (t !== tab && ['stock', 'list', 'meals', 'scan', 'stats'].indexOf(t) >= 0) setTab(t); });
