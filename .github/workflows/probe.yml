@@ -1,0 +1,16 @@
+name: probe
+on: push
+jobs:
+  p:
+    if: github.ref_name == 'probe-live'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in https://cart.hania360.com/bridge.html https://gil.hania360.com/bridge.html https://check.hania360.com/sw.js https://check.hania360.com/api/shabbat/key https://hania360.com/; do echo "== $u $(curl -s -o /tmp/o -w '%{http_code}' $u)"; done
+          curl -s https://hania360.com/ | grep -o 'bridges()\|gil.hania360.com/bridge.html' | sort | uniq -c
+          curl -s https://check.hania360.com/sw.js | grep -c 'push'
+          curl -s https://check.hania360.com/api/shabbat/key
+          curl -s https://check.hania360.com/ | grep -o 'להזכיר לי בטלפון לפני הטסט' | head -1
+          curl -s https://kids.hania360.com/ | grep -o 'אתגר משפחתי' | head -1
+          curl -s https://gil.hania360.com/ | grep -o 'data-act="wish"' | head -1
+          curl -s https://cart.hania360.com/ | grep -o 'כנראה אוזל לכם\|הסל הקבוע שלכם' | sort -u
