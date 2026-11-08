@@ -1040,9 +1040,9 @@ function planMeals(count, quick) {
   api('POST', '/api/meals', { count: count, people: people, urgent: urgent, have: have.slice(0, 120), prefs: prefs }).then(function (j) {
     planBusy = false; $('mBusy').hidden = true; $('mGo').disabled = false;
     if (!j.meals || !j.meals.length) { $('mMsg').textContent = 'לא התקבלו הצעות. נסו שוב.'; $('mMsg').hidden = false; return; }
-    if (quick) { quickPlan = j.meals; renderPlan(); return; }
+    if (quick) { quickPlan = j.meals; quickEat = j.eatSoon || []; renderPlan(); return; }
     quickPlan = null;
-    put('plan', 'current', { created: Date.now(), people: people, prefs: prefs, meals: j.meals });
+    put('plan', 'current', { created: Date.now(), people: people, prefs: prefs, meals: j.meals, eatSoon: j.eatSoon || [] });
   }, function (e) { planBusy = false; $('mBusy').hidden = true; $('mGo').disabled = false; $('mMsg').textContent = aiError(e); $('mMsg').hidden = false; });
 }
 $('mGo').addEventListener('click', function () { ls('hc.prefs', $('mPrefs').value); ls('hc.people', $('mPeople').value); planMeals(+$('mCount').value, false); });
@@ -1063,12 +1063,20 @@ function mealCard(m, i, plan) {
     miss.length ? h('div', { class: 'tags' }, miss.map(function (u) { return h('span', { class: 'tag miss' }, 'לקנות: ' + u); })) : null,
     m.how ? h('p', { class: 'meta out' }, m.how) : null);
 }
+var quickEat = [];
+// Ready-to-eat products (מילקי, yogurt, snacks) are not cooked; the plan lists them to finish as they are.
+function eatCard(list) {
+  if (!list || !list.length) return null;
+  return h('div', { class: 'card meal' }, h('div', { class: 'head' }, h('span', { class: 'dish' }, '🥄 לאכול כמו שהם')),
+    h('div', { class: 'rows' }, list.map(function (e) { return h('p', { class: 'meta' }, h('b', null, e.product), e.idea ? ' · ' + e.idea : ''); })));
+}
 function renderPlan() {
   var box = $('planBox'), kids = [];
   if (quickPlan) {
     var allMiss = [].concat.apply([], quickPlan.map(function (m) { return m.missing || []; }));
     kids.push(h('div', { class: 'sheet-head' }, h('h2', null, 'מה לבשל ממה שעומד לפוג'), h('button', { type: 'button', class: 'quiet', onclick: function () { quickPlan = null; renderPlan(); } }, 'סגור')));
     kids.push.apply(kids, quickPlan.map(function (m, i) { return mealCard(m, i, false); }));
+    if (eatCard(quickEat)) kids.push(eatCard(quickEat));
     if (missingNotHeld(allMiss).length) kids.push(h('button', { type: 'button', class: 'primary', onclick: function () { addMissing(allMiss); renderPlan(); } }, 'הוסף את החסרים לרשימה'));
   }
   var p = S.plan.current;
@@ -1076,6 +1084,7 @@ function renderPlan() {
     var allM = [].concat.apply([], p.meals.filter(function (m) { return !m.done; }).map(function (m) { return m.missing || []; }));
     kids.push(h('div', { class: 'sheet-head' }, h('h2', null, 'התוכנית של השבוע'), h('span', { class: 'meta' }, 'נוצרה ' + dm(iso(new Date(p.created))))));
     kids.push.apply(kids, p.meals.map(function (m, i) { return mealCard(m, i, true); }));
+    if (eatCard(p.eatSoon)) kids.push(eatCard(p.eatSoon));
     kids.push(h('div', { class: 'bar' },
       missingNotHeld(allM).length ? h('button', { type: 'button', class: 'primary', onclick: function () { addMissing(allM); } }, 'הוסף את כל החסרים לרשימה') : h('p', { class: 'note' }, 'כל מה שצריך לתוכנית כבר בבית או ברשימה.'),
       h('button', { type: 'button', class: 'danger', onclick: function () { var u = snap([['plan', 'current']]); put('plan', 'current', null); toast('התוכנית נמחקה', u); } }, 'מחק תוכנית')));
