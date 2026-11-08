@@ -187,6 +187,7 @@ async function postScan(req, env) {
   const r = await askAI(env, { prompt: scanPrompt(mode, ilNow().day), image, mediaType });
   if (r.error) return json({ error: r.error }, r.error === 'no_ai' ? 503 : r.error === 'cap' ? 429 : 502);
   const c = cleanScan(mode, r.value);
+  if (mode === 'receipt') c.items = c.items.filter((x) => !NOT_ITEM.test(x.name) && !NOT_ITEM.test(x.raw || ''));
   if (mode === 'receipt' && c.items.length) await fixNames(env, c.items);
   return json(c);
 }
@@ -202,6 +203,8 @@ export function namesPrompt(items) {
     + 'Trust the store catalog name when given. Use only real Hebrew words; if a line cannot be understood, return the printed text unchanged. '
     + 'Reply with JSON only: {"names": [one name per line, same order]}';
 }
+// Lines that are not products, which the photo pass sometimes keeps anyway.
+const NOT_ITEM = /^(שקית|שקיות|פיקדון|פקדון|הנחה|הנחת|מבצע|עודף|סה"?כ|מע"?מ)/;
 async function fixNames(env, items) {
   try {
     const codes = [...new Set(items.map((x) => x.code).filter(Boolean))];
