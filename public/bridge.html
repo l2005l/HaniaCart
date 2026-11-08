@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>HaniaCart bridge</title>
+<script>
+// The hania360.com search box asks what is at home: product names in stock and on the open list.
+// Answers only the hania360.com home page, and only names and amounts (no prices, no household key).
+(function () {
+  if (window.parent === window) return;
+  var S = {}; try { S = JSON.parse(localStorage.getItem('hc.cache') || '{}') || {}; } catch (e) {}
+  var vals = function (o) { return Object.keys(o || {}).map(function (k) { return o[k]; }).filter(Boolean); };
+  var stock = vals(S.item).filter(function (i) { return i.name; }).slice(0, 400).map(function (i) { return [String(i.name).slice(0, 60), +i.qty || 0, i.exp || '']; });
+  var list = vals(S.list).filter(function (l) { return l.name && !l.done; }).slice(0, 200).map(function (l) { return String(l.name).slice(0, 60); });
+  // postMessage with a fixed target origin: any other page that frames this one receives nothing.
+  (location.ancestorOrigins && /^https:\/\/(www\.)?hania360\.com$/.test(location.ancestorOrigins[0] || '') ? [location.ancestorOrigins[0]] : ['https://hania360.com', 'https://www.hania360.com']).forEach(function (o) { window.parent.postMessage({ hania: 'bridge', app: 'cart', stock: stock, list: list }, o); });
+})();
+</script>
