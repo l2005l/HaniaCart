@@ -419,3 +419,14 @@ test('a household picks branches near it and sees their prices and deals', async
     assert.deepEqual(msg, {}, 'the same deals are not sent twice');
   } finally { globalThis.fetch = orig; }
 });
+
+test('regular products whose usual gap has passed are running low', async () => {
+  const { runningLow, dueText } = await import('../src/push.js');
+  const buys = ['2026-10-01', '2026-10-08', '2026-10-15', '2026-10-22'].map((date) => ({ name: 'חלב 3%', date }))
+    .concat(['2026-09-01', '2026-10-20', '2026-10-22'].map((date) => ({ name: 'קמח', date })));
+  assert.deepEqual(runningLow(buys, [], [], '2026-10-29'), ['חלב 3%']);
+  assert.deepEqual(runningLow(buys, [{ name: 'חלב 3%', qty: 1 }], [], '2026-10-29'), []);
+  assert.deepEqual(runningLow(buys, [], [{ name: 'חלב 3%', done: false }], '2026-10-29'), []);
+  assert.deepEqual(runningLow(buys, [], [], '2026-10-25'), []);
+  assert.match(dueText([], '2026-10-29', ['חלב 3%']).body, /כנראה אוזל: חלב 3%/);
+});

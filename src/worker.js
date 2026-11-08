@@ -1,4 +1,4 @@
-import { okEndpoint, vapid, wake, subId, ilNow, dueText } from './push.js';
+import { okEndpoint, vapid, wake, subId, ilNow, dueText, runningLow } from './push.js';
 import { gtin14 } from './gtin.js';
 import { refreshLaib, LAIB_SLUGS, useRelay, relayFetch } from './laib.js';
 import { getAccount, linkAccount, unlinkAccount, accountSummary, summaryPreflight, accountListAdd, listAddPreflight } from './account.js';
@@ -549,8 +549,13 @@ export async function runReminders(env, now = Date.now()) {
   const { results } = await env.DB.prepare('SELECT * FROM push_subs WHERE hour=? AND sent<>?').bind(hour, day).all();
   const stock = {};
   for (const s of results) {
-    if (!stock[s.hh]) stock[s.hh] = (await env.DB.prepare("SELECT data FROM rows WHERE hh=? AND kind='item' AND del=0").bind(s.hh).all()).results.map((r) => JSON.parse(r.data));
-    let m = dueText(stock[s.hh], day);
+    if (!stock[s.hh]) {
+      const rows = (await env.DB.prepare("SELECT kind, data FROM rows WHERE hh=? AND kind IN ('item','list','buy') AND del=0").bind(s.hh).all()).results;
+      const of = (k) => rows.filter((r) => r.kind === k).map((r) => JSON.parse(r.data));
+      const items = of('item');
+      stock[s.hh] = { items, out: runningLow(of('buy'), items, of('list'), day) };
+    }
+    let m = dueText(stock[s.hh].items, day, stock[s.hh].out);
     try { m = await withDeals(env, s.hh, m); } catch { /* deals are a bonus */ }
     await env.DB.prepare('UPDATE push_subs SET sent=?, msg=? WHERE id=?').bind(day, m ? JSON.stringify(m) : '', s.id).run();
     if (m && !(await wake(env, s.endpoint))) await env.DB.prepare('DELETE FROM push_subs WHERE id=?').bind(s.id).run();
