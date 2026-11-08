@@ -1,0 +1,14 @@
+name: probe
+on: push
+jobs:
+  p:
+    if: github.ref_name == 'probe-rc'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          HH=probeprobeprobeprobeprobe123
+          B64=$(base64 -w0 probe/r.jpg)
+          echo "{\"mode\":\"receipt\",\"type\":\"image/jpeg\",\"image\":\"$B64\"}" > s.json
+          curl -s -X POST https://cart.hania360.com/api/scan -H "x-hh: $HH" -H 'content-type: application/json' --data @s.json; echo
+          curl -s -X POST https://cart.hania360.com/api/meals -H "x-hh: $HH" -H 'content-type: application/json' --data '{"count":3,"people":4,"urgent":["מילקי שוקו","חזה עוף","יוגורט","עגבניות"],"have":["פסטה","ביצים","בצל","במבה","לחם","אורז"]}'; echo
