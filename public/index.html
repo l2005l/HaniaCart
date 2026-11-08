@@ -77,6 +77,7 @@ button:disabled{opacity:.5;cursor:default}
 .step.sm button{width:30px;height:30px;font-size:1rem}
 .alert{border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line));background:color-mix(in srgb,var(--warn) 9%,var(--surface));border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
 .alert p{margin:0}
+.alert.low{border-color:var(--line);background:var(--surface)}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
 .card p{margin:0}
 .empty{color:var(--muted);text-align:center;padding:26px 16px;border:1px dashed var(--line);border-radius:16px;margin:0}
@@ -174,6 +175,7 @@ dialog form.addrow{flex-direction:row;gap:8px}
   <!-- STOCK -->
   <section class="view" id="v-stock">
     <div id="alert" class="alert" hidden></div>
+    <div id="lowBox" class="alert low" hidden></div>
     <form class="addrow" id="stockAdd">
       <input type="search" id="stockQ" placeholder="חיפוש או הוספה, למשל: חלב 2" autocomplete="off" aria-label="חיפוש או הוספת מוצר למלאי">
       <button class="primary" type="submit">הוסף</button>
@@ -642,7 +644,7 @@ function render() {
   $('nStock').hidden = !urgent.length; $('nStock').textContent = urgent.length;
   $('nList').hidden = !open; $('nList').textContent = open;
   renderSummary();
-  if (tab === 'stock') { renderAlert(urgent); renderStock(); }
+  if (tab === 'stock') { renderAlert(urgent); renderLow(); renderStock(); }
   if (tab === 'list') { renderFavEntry(); renderSuggest(); renderList(); }
   if ($('favs').open) renderFavs();
   if (tab === 'meals') renderPlan();
@@ -654,6 +656,25 @@ function renderSummary() {
   $('summary').textContent = items.length + ' מוצרים בבית · ' + (soon ? soon + ' לאכול בקרוב · ' : '') + open + ' ברשימה' + (!online ? ' · אין חיבור, נשמר במכשיר' : outbox.length ? ' · שומר…' : '');
 }
 
+// Regular products whose usual gap since the last purchase has passed (same rule as the morning push).
+function runningLow() {
+  var listNames = all('list').filter(function (l) { return !l.done; }).map(function (l) { return l.name; });
+  return purchaseStats().filter(function (s) {
+    if (!s.every || s.n < 3 || s.every > 45) return false;
+    var since = daysBetween(s.last, today());
+    return since >= s.every - 1 && since <= s.every * 3 && !inStock(s.name) && !listNames.some(function (x) { return similar(x, s.name); });
+  }).sort(function (a, b) { return a.dueIn - b.dueIn; }).slice(0, 10);
+}
+function renderLow() {
+  var low = runningLow(), box = $('lowBox');
+  box.hidden = !low.length;
+  if (!low.length) return;
+  box.replaceChildren(
+    h('p', null, h('b', null, '🛒 כנראה אוזל לכם')),
+    h('p', { class: 'meta' }, 'לפי הקניות הקודמות, הגיע הזמן לקנות שוב:'),
+    h('div', { class: 'chips' }, low.map(function (s) { return h('button', { type: 'button', class: 'chip add', title: 'נקנה בערך כל ' + Math.round(s.every) + ' ימים', onclick: function () { addToList(s.name, 1); toast(s.name + ' נוסף לרשימה'); } }, s.name); })),
+    h('div', { class: 'bar' }, h('button', { type: 'button', onclick: function () { bulk(function () { low.forEach(function (s) { addToList(s.name, 1); }); }); toast(low.length === 1 ? 'נוסף לרשימה' : low.length + ' מוצרים נוספו לרשימה'); } }, 'הוסף הכול לרשימה')));
+}
 function renderAlert(urgent) {
   var box = $('alert');
   box.hidden = !urgent.length;
@@ -830,19 +851,19 @@ function listMain(l) {
     (l.by || l.auto) ? h('div', { class: 'meta' }, l.auto ? 'נוסף אוטומטית' : 'הוסיף/ה ' + l.by) : null);
 }
 // What the open list would cost in each chain, from the items that have a barcode.
-function basketCard(items) {
+function basketCard(items, title, note) {
   var priced = items.map(function (l) { var f = favFor(l.name); return { l: l, rows: f && f.code ? PR[f.code] : null }; }).filter(function (x) { return x.rows && x.rows.length; });
   if (!priced.length) return null;
   var chains = {};
   priced.forEach(function (x) { x.rows.forEach(function (r) { var c = chains[r.chain] = chains[r.chain] || { total: 0, n: 0 }; c.total += eff(r) * (x.l.qty || 1); c.n++; }); });
   var names = Object.keys(chains).sort(function (a, b) { return (chains[b].n - chains[a].n) || chains[a].total - chains[b].total; });
   return h('div', { class: 'card basket' },
-    h('b', null, 'כמה תעלה הרשימה בכל רשת'),
+    h('b', null, title || 'כמה תעלה הרשימה בכל רשת'),
     h('div', { class: 'rows' }, names.map(function (n, i) {
       var c = chains[n];
       return h('div', { class: 'row' }, h('div', { class: 'main name' }, n), h('span', { class: 'meta' }, c.n + ' מתוך ' + priced.length), h('span', { class: 'pill' + (i === 0 ? ' ok' : '') }, fmt(c.total)));
     })),
-    h('p', { class: 'meta' }, priced.length + ' מתוך ' + items.length + ' המוצרים ברשימה מחוברים לברקוד. לחיצה על שם מוצר מחברת אותו.'),
+    h('p', { class: 'meta' }, note || priced.length + ' מתוך ' + items.length + ' המוצרים ברשימה מחוברים לברקוד. לחיצה על שם מוצר מחברת אותו.'),
     h('button', { type: 'button', class: 'quiet', style: 'align-self:flex-start', onclick: openStores }, MYST && MYST.mine ? 'הסניפים שלכם · לשנות' : '📍 להשוות בסניפים הקרובים אליכם'));
 }
 
@@ -1107,7 +1128,7 @@ function scan(file, mode) {
   $('draftBox').hidden = true; $('scanPick').hidden = true; $('scanBusy').hidden = false; $('scanMsg').hidden = true;
   shrink(file).then(function (dataUrl) { return api('POST', '/api/scan', { mode: mode, image: dataUrl.split(',')[1], type: 'image/jpeg' }); }).then(function (r) {
     $('scanBusy').hidden = true; $('scanMsg').hidden = false;
-    draft = (r.items || []).map(function (x) { var it = newItem(x.name, x.qty, { cat: x.cat, loc: x.loc, exp: x.exp, shelfDays: x.shelfDays, price: x.price }); it.linePrice = x.price; return it; });
+    draft = (r.items || []).map(function (x) { var it = newItem(x.name, x.qty, { cat: x.cat, loc: x.loc, exp: x.exp, shelfDays: x.shelfDays, price: x.price }); it.linePrice = x.price; it.code = gtin14(x.code); return it; });
     draftMode = mode; draftDate = r.date && r.date <= today() ? r.date : today();
     if (!draft.length) { $('scanMsg').textContent = 'לא זוהו מוצרים בתמונה. נסו צילום חד וקרוב יותר, באור טוב.'; $('scanPick').hidden = false; return; }
     $('draftStore').value = r.store || ''; $('draftTotal').value = r.total || (mode === 'receipt' ? sumPrices() : '');
@@ -1142,6 +1163,8 @@ $('draftSave').addEventListener('click', function () {
     if (zero) put('item', zero.id, Object.assign(strip(zero), { qty: d.qty, exp: d.exp, est: d.est, price: d.price || zero.price, opened: false }));
     else put('item', rid(), data);
     if (draftMode === 'receipt') put('buy', rid(), { name: data.name, cat: d.cat, qty: d.qty, price: d.price, store: store, date: draftDate });
+    // A barcode printed on the receipt connects the product to the chains' prices.
+    if (draftMode === 'receipt' && d.code) { var fv = favFor(data.name); if (!fv) put('fav', rid(), { name: data.name, cat: CATS[d.cat] ? d.cat : guessCat(data.name), added: Date.now(), code: d.code }); else if (!fv.code) put('fav', fv.id, Object.assign(strip(fv), { code: d.code })); }
   });
   if (draftMode === 'receipt') {
     all('list').forEach(function (l) { if (rows.some(function (d) { return similar(d.name, l.name); })) { put('list', l.id, null); cleared++; } });
@@ -1169,7 +1192,18 @@ function renderStats() {
     sp.push(h('p', { class: 'big' }, fmt(sums[cur] || 0), h('span', { class: 'meta' }, ' החודש · חודש קודם ' + fmt(sums[prev] || 0))));
     sp.push(h('div', { class: 'bars' }, keys.map(function (k) { return [h('span', { class: 'meta' }, k.slice(5) + '/' + k.slice(2, 4)), h('div', { class: 'track' }, h('div', { class: 'fill', style: 'width:' + ((sums[k] || 0) / max * 100) + '%' })), h('span', { class: 'val' }, fmt(sums[k] || 0))]; })));
   }
-  $('spendBox').replaceChildren.apply($('spendBox'), [h('div', { class: 'card' }, sp)]);
+  // Where the month's money went, by category, from the receipt lines.
+  var cs = {}, ctot = 0;
+  all('buy').forEach(function (b) { if (String(b.date || '').slice(0, 7) !== cur || !b.price) return; var c = CATS[b.cat] ? b.cat : 'other'; cs[c] = (cs[c] || 0) + (+b.price || 0); ctot += +b.price || 0; });
+  var cats = Object.keys(cs).sort(function (a, b) { return cs[b] - cs[a]; }), cmax = cats.length ? cs[cats[0]] : 1;
+  var catCard = cats.length ? h('div', { class: 'card' }, h('h2', null, 'החודש לפי קטגוריה'),
+    h('div', { class: 'bars' }, cats.map(function (c) { return [h('span', { class: 'meta' }, CATS[c].he), h('div', { class: 'track' }, h('div', { class: 'fill', style: 'width:' + (cs[c] / cmax * 100) + '%' })), h('span', { class: 'val' }, fmt(cs[c]) + ' · ' + Math.round(cs[c] / ctot * 100) + '%')]; })),
+    h('p', { class: 'meta' }, 'לפי שורות המוצרים בחשבוניות שנסרקו החודש.')) : null;
+  // The household's regular basket (bought on 3+ days in the last four months) priced in each chain.
+  var regular = purchaseStats().filter(function (x) { return x.n >= 3 && daysBetween(x.last, today()) <= 120; }).map(function (x) { return { name: x.name, qty: 1 }; });
+  loadPrices(regular.map(function (l) { var f = favFor(l.name); return f && f.code; }).filter(Boolean));
+  var regCard = regular.length ? basketCard(regular, '🧺 הסל הקבוע שלכם: איפה הכי זול', regular.length + ' מוצרים שאתם קונים שוב ושוב. ההשוואה כוללת את אלה שמחוברים לברקוד (לחיצה על שם מוצר ברשימה מחברת אותו).') : null;
+  $('spendBox').replaceChildren.apply($('spendBox'), [h('div', { class: 'card' }, sp), catCard, regCard].filter(Boolean));
 
   var w = all('waste').filter(function (x) { return iso(new Date(x.at || 0)).slice(0, 7) === cur; }), cost = w.reduce(function (s, x) { return s + (+x.price || 0); }, 0);
   var wk = [h('h2', null, 'נזרק החודש')];

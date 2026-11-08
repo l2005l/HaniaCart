@@ -47,24 +47,51 @@ export function ilNow(now = Date.now()) {
 
 export const dayDiff = (a, b) => Math.round((Date.parse(a + 'T12:00:00Z') - Date.parse(b + 'T12:00:00Z')) / 864e5);
 
+const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+function similar(a, b) {
+  a = norm(a); b = norm(b); if (a.length < 2 || b.length < 2) return false; if (a === b) return true;
+  const s = a.length < b.length ? a : b, l = s === a ? b : a;
+  if (l.indexOf(s + ' ') === 0) return true;
+  return s.length >= 4 && (' ' + l + ' ').indexOf(' ' + s + ' ') >= 0;
+}
+// Products the household buys regularly (3+ separate days, with a steady gap) whose usual gap has
+// passed since the last purchase, and that are neither in stock nor on the open list.
+// The same rule as the "running low" card in the app.
+export function runningLow(buys, items, list, day) {
+  const by = {};
+  for (const b of buys) { if (!b || !b.date || !b.name) continue; const k = norm(b.name); const o = by[k] = by[k] || { name: b.name, dates: new Set(), last: '' }; o.dates.add(b.date); if (b.date >= o.last) { o.last = b.date; o.name = b.name; } }
+  const out = [];
+  for (const o of Object.values(by)) {
+    const ds = [...o.dates].sort(); if (ds.length < 3) continue;
+    const gaps = []; for (let i = 1; i < ds.length; i++) gaps.push(dayDiff(ds[i], ds[i - 1]));
+    const every = gaps.reduce((a, b) => a + b, 0) / gaps.length, since = dayDiff(day, o.last);
+    if (every > 45 || since > every * 3) continue; // not a regular any more
+    if (since < every - 1) continue;
+    if (items.some((i) => i.qty > 0 && similar(i.name, o.name)) || list.some((l) => !l.done && similar(l.name, o.name))) continue;
+    out.push([since - every, o.name]);
+  }
+  return out.sort((a, b) => b[0] - a[0]).map((x) => x[1]);
+}
+
 // The morning message for a household, or null when nothing needs attention.
 // items: cleaned stock rows. Counts what expires within two days and staples below their minimum.
-export function dueText(items, day) {
+export function dueText(items, day, out = []) {
   const soon = [], gone = [], low = [];
   for (const it of items) {
     if (it.exp && it.qty > 0) { const d = dayDiff(it.exp, day); if (d < 0) gone.push(it.name); else if (d <= 2) soon.push([d, it.name]); }
     if (it.staple && it.qty < (it.minq || 1)) low.push(it.name);
   }
-  if (!soon.length && !gone.length && !low.length) return null;
+  if (!soon.length && !gone.length && !low.length && !out.length) return null;
   soon.sort((a, b) => a[0] - b[0]);
   const parts = [];
   if (soon.length) parts.push('לאכול בקרוב: ' + soon.slice(0, 4).map(([d, n]) => n + (d === 0 ? ' (היום)' : d === 1 ? ' (מחר)' : '')).join(', ') + (soon.length > 4 ? ' ועוד ' + (soon.length - 4) : ''));
   if (gone.length) parts.push('פג תוקף: ' + gone.slice(0, 3).join(', ') + (gone.length > 3 ? ' ועוד ' + (gone.length - 3) : ''));
   if (low.length) parts.push('חסר בבית: ' + low.slice(0, 3).join(', ') + (low.length > 3 ? ' ועוד ' + (low.length - 3) : ''));
+  if (out.length) parts.push('כנראה אוזל: ' + out.slice(0, 3).join(', ') + (out.length > 3 ? ' ועוד ' + (out.length - 3) : ''));
   const n = soon.length + gone.length;
   return {
-    title: n ? (n === 1 ? 'מוצר אחד צריך תשומת לב' : n + ' מוצרים צריכים תשומת לב') : 'מוצרי בסיס נגמרים',
+    title: n ? (n === 1 ? 'מוצר אחד צריך תשומת לב' : n + ' מוצרים צריכים תשומת לב') : low.length ? 'מוצרי בסיס נגמרים' : 'כנראה אוזל לכם',
     body: parts.join(' · '),
-    url: '/#stock',
+    url: n || low.length ? '/#stock' : '/#list',
   };
 }
