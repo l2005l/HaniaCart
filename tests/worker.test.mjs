@@ -72,7 +72,7 @@ test('scan answers are cleaned and need an AI', async () => {
   const env = { DB: fakeD1() };
   const img = { mode: 'receipt', image: 'QUJD', type: 'image/jpeg' };
   assert.equal((await call(env, 'POST', '/api/scan', { hh: HH, body: img })).status, 503);
-  env.AI = { run: async (model, input) => { assert.match(model, /vision|scout/); assert.equal(input.messages[0].content[1].type, 'image_url');
+  env.AI = { run: async (model, input) => { assert.match(model, /gemma|scout/); if (!input.messages[0].content.map) return { response: { names: ['חלב 3%'] } }; assert.equal(input.messages[0].content[1].type, 'image_url');
     return { response: '```json\n{"store":"שופרסל","date":"2026-10-12","total":"123.4","items":[{"name":"חלב 3%","qty":2,"price":13.8,"cat":"dairy","loc":"fridge","shelfDays":7},{"name":""}]}\n```' }; } };
   const r = await (await call(env, 'POST', '/api/scan', { hh: HH, body: img })).json();
   assert.equal(r.store, 'שופרסל'); assert.equal(r.total, 123.4); assert.equal(r.items.length, 1); assert.equal(r.items[0].shelfDays, 7);
