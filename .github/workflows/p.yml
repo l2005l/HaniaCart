@@ -1,0 +1,12 @@
+name: probe
+on: push
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in "https://hania360.com/" "https://hania360.com/classic" "https://hania360.com/now" "https://hania360.com/guides/hapoel-tel-aviv-top-before-break" "https://hania360.com/api/now/list" "https://sport.hania360.com/"; do echo "$u $(curl -s -o /tmp/b -w '%{http_code}' "$u") now=$(grep -c 'id=\"now\"' /tmp/b) art=$(grep -c 'אליניב' /tmp/b)"; done
+          curl -s https://hania360.com/api/sport/il | head -c 400; echo
+          curl -s "https://hania360-home.lior-hania.workers.dev/api/sport/euro?app=sport" | head -c 300; echo
+          curl -s "https://hania360-home.lior-hania.workers.dev/api/sport/nba?app=sport" | head -c 300; echo
+          curl -s "https://hania360-home.lior-hania.workers.dev/?app=sport" | grep -o '<title>[^<]*'
