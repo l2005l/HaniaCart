@@ -5,4 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for f in icon-192.png icon-512.png apple-180.png; do echo "IC $f $(curl -s https://sport.hania360.com/icons/$f | md5sum | cut -c1-8) $(curl -sI https://sport.hania360.com/icons/$f | grep -i 'cache-control\|cf-cache' | tr -d '\r' | tr '\n' ' ')"; done
+          echo "M $(curl -s https://hania360.com/manifest.webmanifest | head -c 120)"
+          echo "S $(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://hania360.com/sw.js)"
+          echo "I $(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://hania360.com/icons/icon-512.png)"
+          echo "H $(curl -s https://hania360.com/ | grep -c 'hInstBtn')"
