@@ -1,5 +1,1 @@
-now-car|?car keys hand
-now-fuel|?fuel nozzle petrol pump
-vouchers-before-they-expire|Intertoys gift card (2018 model).jpg
-spotting-real-sales|?sale sign percent shop window
-now-shopping|?Azrieli Mall interior
+spotting-real-sales|Annual^ closing down sale - geograph.org.uk - 1096071.jpg
