@@ -5,5 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for u in https://hania360.com/img/now-flydubai.webp https://hania360.com/img/hapoel-tel-aviv-top-before-break.jpg; do echo "$u $(curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}' $u)"; done
-          curl -s https://hania360.com/guides/hapoel-tel-aviv-top-before-break | grep -o 'og:image" content="[^"]*\|class="cover"' | sort | uniq -c
+          curl -s https://hania360.com/ -o h.html; echo "home $(grep -c 'nowMeBtn' h.html) $(grep -c 'h360pref' h.html)"
+          echo "euro $(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/api/sport/euro)"
+          curl -s https://dat.hania360.com/ | grep -c 'h360pref' | sed 's/^/dat /'
+          curl -s https://cart.hania360.com/ | grep -c 'h360_i' | sed 's/^/cart /'
+          curl -s https://hania360.com/privacy | grep -c 'h360_i' | sed 's/^/privacy /'
