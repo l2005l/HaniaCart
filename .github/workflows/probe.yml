@@ -1,0 +1,13 @@
+name: probe
+on: push
+jobs:
+  p:
+    if: github.ref_name == 'probe-kf'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e
+          curl -s -A 'Mozilla/5.0' https://save.hania360.com/services > /tmp/s.html
+          echo "R car-link: $(grep -c 'href="/services/car"' /tmp/s.html) travel-link: $(grep -c 'href="/services/travel"' /tmp/s.html)"
+          curl -s -A 'Mozilla/5.0' https://save.hania360.com/services/travel | grep -o 'Airalo' | head -1 | sed 's/^/R /'
+          true
