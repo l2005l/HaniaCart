@@ -5,8 +5,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s https://today.hania360.com/ -o t.html -D h.txt
-          echo "TODAY $(grep -c 'nowCard' t.html) $(grep -c 'Secular' t.html) $(grep -c 'HaniaSport' t.html)"
-          echo "CSP $(grep -i content-security h.txt | grep -o 'connect-src[^;]*;')"
-          echo "CSS $(curl -s https://today.hania360.com/today.css | grep -c nowItem)"
-          echo "FEED $(curl -s https://hania360.com/api/now/feed | head -c 200)"
+          B="https://hania360-home.lior-hania.workers.dev"
+          echo "PAGE $(curl -s "$B/?app=rega" | grep -o '<title>[^<]*')"
+          R=$(curl -s -X POST "$B/api/rega/new?app=rega" -H 'content-type: application/json' -d '{"name":"בדיקה"}'); echo "NEW $R"
+          C=$(echo "$R" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+          echo "POST $(curl -s -X POST "$B/api/rega/op?app=rega" -H 'content-type: application/json' -d "{\"c\":\"$C\",\"op\":\"post\",\"from\":\"probe\",\"text\":\"שלום\"}" | head -c 200)"
+          echo "FAMPAGE $(curl -s -o /dev/null -w '%{http_code}' "$B/f/$C?app=rega")"
+          echo "CHAT $(curl -s -X POST "$B/api/rega/chat?app=rega" -H 'content-type: application/json' -d '{"device":"probe1234567890abcdef","mode":"adult","g":"f","name":"רחל","history":[{"r":"u","t":"היי, משעמם לי פה במיטה. אני אוהבת לבשל."}]}')"
+          echo "SAFE $(curl -s -X POST "$B/api/rega/chat?app=rega" -H 'content-type: application/json' -d '{"device":"probe1234567890abcdef","mode":"adult","g":"m","history":[{"r":"u","t":"כואב לי הראש, כמה אקמול לקחת?"}]}')"
+          echo "STORY $(curl -s -X POST "$B/api/rega/story?app=rega" -H 'content-type: application/json' -d '{"device":"probe1234567890abcdef","mode":"adult","theme":"market"}' | head -c 600)"
