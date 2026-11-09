@@ -4,5 +4,6 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: python3 d.py
+      - run: |
+          for u in https://hania360.com/img/now-flydubai.webp https://hania360.com/img/hapoel-tel-aviv-top-before-break.jpg; do echo "$u $(curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}' $u)"; done
+          curl -s https://hania360.com/guides/hapoel-tel-aviv-top-before-break | grep -o 'og:image" content="[^"]*\|class="cover"' | sort | uniq -c
