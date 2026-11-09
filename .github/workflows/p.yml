@@ -5,8 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s https://hania360.com/ -o h.html; echo "home $(grep -c 'nowMeBtn' h.html) $(grep -c 'h360pref' h.html)"
-          echo "euro $(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/api/sport/euro)"
-          curl -s https://dat.hania360.com/ | grep -c 'h360pref' | sed 's/^/dat /'
-          curl -s https://cart.hania360.com/ | grep -c 'h360_i' | sed 's/^/cart /'
-          curl -s https://hania360.com/privacy | grep -c 'h360_i' | sed 's/^/privacy /'
+          sleep 30
+          for u in https://cart.hania360.com/ https://go.hania360.com/ https://save.hania360.com/; do echo "CHK $u $(curl -s $u | grep -c 'h360_i')"; done
