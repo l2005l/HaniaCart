@@ -4,9 +4,5 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          for u in "https://hania360.com/" "https://hania360.com/classic" "https://hania360.com/guides" "https://hania360.com/about"; do echo "$u $(curl -s -o /tmp/b -w "%{http_code}" "$u") light=$(grep -c FBFAFF /tmp/b)"; done
-          curl -s https://hania360.com/api/sport/il | head -c 400; echo
-          curl -s "https://hania360-home.lior-hania.workers.dev/api/sport/euro?app=sport" | head -c 300; echo
-          curl -s "https://hania360-home.lior-hania.workers.dev/api/sport/nba?app=sport" | head -c 300; echo
-          curl -s "https://hania360-home.lior-hania.workers.dev/?app=sport" | grep -o '<title>[^<]*'
+      - uses: actions/checkout@v4
+      - run: python3 s.py
