@@ -5,5 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "chag $(curl -s -o /dev/null -w '%{http_code}' https://chag.hania360.com/) $(curl -sL https://chag.hania360.com/ | grep -o '<title>[^<]*' | head -1)"
-          echo "tile $(curl -s https://yahadut.hania360.com/ | grep -c 'chag.hania360.com')"
+          echo "kids $(curl -s https://kids.hania360.com/ | grep -c 'ivrit')"
+          echo "ivrit $(curl -s -o /dev/null -w '%{http_code}' https://ivrit.hania360.com/)"
