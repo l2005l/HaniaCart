@@ -5,7 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "M $(curl -s https://hania360.com/manifest.webmanifest | head -c 120)"
-          echo "S $(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://hania360.com/sw.js)"
-          echo "I $(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://hania360.com/icons/icon-512.png)"
-          echo "H $(curl -s https://hania360.com/ | grep -c 'hInstBtn')"
+          for h in regatov.hania360.com rega.hania360.com chag.hania360.com; do echo "$h $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://$h/) title=$(curl -sL https://$h/ | grep -o '<title>[^<]*' | head -1)"; done
+          echo "visits-code $(curl -s https://regatov.hania360.com/ | grep -c 'מי מגיע לבקר')"
