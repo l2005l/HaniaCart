@@ -5,13 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s "https://www.sefaria.org/api/calendars?timezone=Asia/Jerusalem&diaspora=0" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('CAL',i['title']['en'],'|',i['displayValue'].get('he'),'|',i['ref'],'|',i.get('url')) for i in d['calendar_items']]"
-          REF=$(curl -s "https://www.sefaria.org/api/calendars?timezone=Asia/Jerusalem" | python3 -c "import json,sys;d=json.load(sys.stdin);print([i['url'] for i in d['calendar_items'] if i['title']['en']=='Daf Yomi'][0])")
-          echo "REF $REF"
-          curl -s "https://www.sefaria.org/api/texts/versions/$REF" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('VER',v.get('language'),'|',v.get('versionTitle'),'|',v.get('license'),'|',v.get('actualLanguage')) for v in d]"
-          curl -s "https://www.sefaria.org/api/v3/texts/$REF?version=hebrew&version=english&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);print('KEYS',list(d.keys()));[print('V3',v.get('versionTitle'),v.get('license'),str(v.get('text'))[:300]) for v in d.get('versions',[])]"
-          curl -s "https://www.sefaria.org/api/v3/texts/$REF?version=hebrew%7CWilliam%20Davidson%20Edition%20-%20Vocalized%20Aramaic&version=hebrew%7CWilliam%20Davidson%20Edition%20-%20Vocalized%20Punctuated%20Aramaic&return_format=text_only" | head -c 600; echo
-          curl -s "https://www.sefaria.org/api/related/$REF" | python3 -c "import json,sys;d=json.load(sys.stdin);import collections;c=collections.Counter(l.get('collectiveTitle',{}).get('en') for l in d.get('links',[]));print('LINKS',c.most_common(15))"
-          H=$(curl -s "https://www.sefaria.org/api/calendars?timezone=Asia/Jerusalem" | python3 -c "import json,sys;d=json.load(sys.stdin);print([i['url'] for i in d['calendar_items'] if 'Halakh' in i['title']['en']][0])")
-          echo "HAL $H"
-          curl -s "https://www.sefaria.org/api/v3/texts/$H?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('HV',v.get('versionTitle'),v.get('license'),str(v.get('text'))[:400]) for v in d.get('versions',[])]"
+          R=Bekhorot.55a
+          curl -s "https://www.sefaria.org/api/texts/versions/$R" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('VER',v.get('language'),'|',v.get('versionTitle'),'|',v.get('license')) for v in d]" 2>&1 | head -20
+          curl -s "https://www.sefaria.org/api/v3/texts/$R?version=hebrew&version=english&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('V3',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:500]) for v in d.get('versions',[])]" 2>&1 | head
+          curl -s "https://www.sefaria.org/api/v3/texts/$R?version=hebrew%7CWilliam%20Davidson%20Edition%20-%20Vocalized%20Aramaic&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('VOC',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:400]) for v in d.get('versions',[])]" 2>&1 | head
+          curl -s "https://www.sefaria.org/api/related/$R" | python3 -c "import json,sys,collections;d=json.load(sys.stdin);c=collections.Counter(l.get('collectiveTitle',{}).get('en') for l in d.get('links',[]));print('LINKS',c.most_common(15))" 2>&1 | head -3
+          curl -s "https://www.sefaria.org/api/v3/texts/Steinsaltz_on_$R?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('STZ',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:500]) for v in d.get('versions',[])]" 2>&1 | head
+          curl -s "https://www.sefaria.org/api/v3/texts/Rashi_on_$R?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('RASHI',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:300]) for v in d.get('versions',[])]" 2>&1 | head
+          curl -s "https://www.sefaria.org/api/v3/texts/Shulchan_Arukh,_Orach_Chayim.296.4-6?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('HV',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:500]) for v in d.get('versions',[])]" 2>&1 | head
+          curl -s "https://www.sefaria.org/api/v3/texts/Mishnah_Berurah.296.4?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('MB',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:300]) for v in d.get('versions',[])]" 2>&1 | head
+          curl -sI "https://www.sefaria.org/api/calendars" | grep -i "access-control\|cache"
