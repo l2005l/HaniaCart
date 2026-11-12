@@ -2,22 +2,7 @@ name: probe
 on: push
 jobs:
   p:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "status $(curl -s -o /dev/null -w '%{http_code}' https://limud.hania360.com/)"
-          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Bekhorot.55","kind":"daf","mode":"quiz"}' | head -c 1500; echo
-          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Bekhorot.55","kind":"daf","mode":"ask","q":"מה הקושיה על רב?"}' | head -c 1500; echo
-          mkdir t && cd t && npm i -s playwright@1.49.1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
-          cat > t.mjs <<'J'
-          import { chromium } from 'playwright';
-          const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 390, height: 844 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
-          await p.goto('https://limud.hania360.com/'); await p.waitForSelector('.seg', { timeout: 20000 }).catch(() => {});
-          console.log('HERO', await p.textContent('#hero'));
-          console.log('SEGS', (await p.$$('.seg')).length, 'EX', (await p.$$('.ex')).length, 'TERMS', (await p.$$('.term')).length);
-          console.log('SEG1', (await p.textContent('.seg')).slice(0, 300));
-          await p.click('text=רש״י'); await p.waitForTimeout(4000); console.log('RASHI', (await p.$$('.cm')).length);
-          await p.click('#t-hal'); await p.waitForSelector('.seif', { timeout: 20000 }).catch(() => {}); console.log('HAL', await p.textContent('#hero'), '|', (await p.$$('.seif')).length, '|', (await p.textContent('.seif')).slice(0, 200), '| rema', (await p.$$('.rema')).length);
-          await p.screenshot({ path: 'h.png' }); console.log('ERRS', errs); await b.close();
-          J
-          node t.mjs
+          curl -s -X POST https://shigra.hania360.com/api/sipur/story -H 'content-type: application/json' -d '{"device":"probeTestDevice12345","name":"נועה","g":"f","age":6,"place":"forest","friend":"owl","value":"sleep","len":"short"}' | head -c 700; echo
