@@ -6,8 +6,8 @@ jobs:
     steps:
       - run: |
           echo "status $(curl -s -o /dev/null -w '%{http_code}' https://limud.hania360.com/)"
-          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Bekhorot.55","kind":"daf","mode":"explain"}' | head -c 1500; echo
-          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Shulchan_Arukh,_Orach_Chayim.296.4-6","kind":"halacha","mode":"explain"}' | head -c 1500; echo
+          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Bekhorot.55","kind":"daf","mode":"quiz"}' | head -c 1500; echo
+          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Bekhorot.55","kind":"daf","mode":"ask","q":"מה הקושיה על רב?"}' | head -c 1500; echo
           mkdir t && cd t && npm i -s playwright@1.49.1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
           cat > t.mjs <<'J'
           import { chromium } from 'playwright';
