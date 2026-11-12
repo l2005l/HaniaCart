@@ -2,16 +2,22 @@ name: probe
 on: push
 jobs:
   p:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - run: |
-          R=Bekhorot.55a
-          curl -s "https://www.sefaria.org/api/texts/versions/$R" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('VER',v.get('language'),'|',v.get('versionTitle'),'|',v.get('license')) for v in d]" 2>&1 | head -20
-          curl -s "https://www.sefaria.org/api/v3/texts/$R?version=hebrew&version=english&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('V3',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:500]) for v in d.get('versions',[])]" 2>&1 | head
-          curl -s "https://www.sefaria.org/api/v3/texts/$R?version=hebrew%7CWilliam%20Davidson%20Edition%20-%20Vocalized%20Aramaic&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('VOC',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:400]) for v in d.get('versions',[])]" 2>&1 | head
-          curl -s "https://www.sefaria.org/api/related/$R" | python3 -c "import json,sys,collections;d=json.load(sys.stdin);c=collections.Counter(l.get('collectiveTitle',{}).get('en') for l in d.get('links',[]));print('LINKS',c.most_common(15))" 2>&1 | head -3
-          curl -s "https://www.sefaria.org/api/v3/texts/Steinsaltz_on_$R?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('STZ',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:500]) for v in d.get('versions',[])]" 2>&1 | head
-          curl -s "https://www.sefaria.org/api/v3/texts/Rashi_on_$R?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('RASHI',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:300]) for v in d.get('versions',[])]" 2>&1 | head
-          curl -s "https://www.sefaria.org/api/v3/texts/Shulchan_Arukh,_Orach_Chayim.296.4-6?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('HV',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:500]) for v in d.get('versions',[])]" 2>&1 | head
-          curl -s "https://www.sefaria.org/api/v3/texts/Mishnah_Berurah.296.4?version=hebrew&return_format=text_only" | python3 -c "import json,sys;d=json.load(sys.stdin);[print('MB',v.get('versionTitle'),'|',v.get('license'),'|',json.dumps(v.get('text'),ensure_ascii=False)[:300]) for v in d.get('versions',[])]" 2>&1 | head
-          curl -sI "https://www.sefaria.org/api/calendars" | grep -i "access-control\|cache"
+          echo "status $(curl -s -o /dev/null -w '%{http_code}' https://limud.hania360.com/)"
+          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Bekhorot.55","kind":"daf","mode":"explain"}' | head -c 1500; echo
+          curl -s -X POST https://limud.hania360.com/api/limud/ai -H 'content-type: application/json' -d '{"ref":"Shulchan_Arukh,_Orach_Chayim.296.4-6","kind":"halacha","mode":"explain"}' | head -c 1500; echo
+          mkdir t && cd t && npm i -s playwright@1.49.1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
+          cat > t.mjs <<'J'
+          import { chromium } from 'playwright';
+          const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 390, height: 844 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
+          await p.goto('https://limud.hania360.com/'); await p.waitForSelector('.seg', { timeout: 20000 }).catch(() => {});
+          console.log('HERO', await p.textContent('#hero'));
+          console.log('SEGS', (await p.$$('.seg')).length, 'EX', (await p.$$('.ex')).length, 'TERMS', (await p.$$('.term')).length);
+          console.log('SEG1', (await p.textContent('.seg')).slice(0, 300));
+          await p.click('text=רש״י'); await p.waitForTimeout(4000); console.log('RASHI', (await p.$$('.cm')).length);
+          await p.click('#t-hal'); await p.waitForSelector('.seif', { timeout: 20000 }).catch(() => {}); console.log('HAL', await p.textContent('#hero'), '|', (await p.$$('.seif')).length, '|', (await p.textContent('.seif')).slice(0, 200), '| rema', (await p.$$('.rema')).length);
+          await p.screenshot({ path: 'h.png' }); console.log('ERRS', errs); await b.close();
+          J
+          node t.mjs
