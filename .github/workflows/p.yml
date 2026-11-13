@@ -5,4 +5,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -s -X POST https://shigra.hania360.com/api/sipur/story -H 'content-type: application/json' -d '{"device":"probeTestDevice12345","name":"נועה","g":"f","age":6,"place":"forest","friend":"owl","value":"sleep","len":"short"}' | head -c 700; echo
+          J=$(curl -s -X POST https://shigra.hania360.com/api/shigra/fam -H 'content-type: application/json' -d '{"op":"new","doc":{"kids":[{"id":"t1","name":"בדיקה","av":"🦊"}],"_t":{"kids":1}}}')
+          echo "NEW $(echo $J | head -c 200)"
+          F=$(echo $J | python3 -c "import json,sys;j=json.load(sys.stdin);print(j['fam'],j['key'])")
+          set -- $F
+          echo "GET $(curl -s -X POST https://shigra.hania360.com/api/shigra/fam -H 'content-type: application/json' -d "{\"op\":\"get\",\"fam\":\"$1\",\"key\":\"$2\",\"ver\":0}" | head -c 200)"
+          echo "BAD $(curl -s -X POST https://shigra.hania360.com/api/shigra/fam -H 'content-type: application/json' -d "{\"op\":\"get\",\"fam\":\"$1\",\"key\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"ver\":0}")"
+          echo "PAGE $(curl -s https://shigra.hania360.com/ | grep -c 'famCard')"
