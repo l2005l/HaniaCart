@@ -5,8 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo skip
-          C=$(curl -s "https://www.sefaria.org/api/calendars?timezone=Asia/Jerusalem&diaspora=0" | python3 -c "import json,sys;d=json.load(sys.stdin);i=[x for x in d['calendar_items'] if x['title']['en']=='Parashat Hashavua'][0];print(json.dumps({'ref':i['ref'],'name':i['displayValue']['he']},ensure_ascii=False))")
-          echo "PAR $C"
-          curl -s -X POST https://limud.hania360.com/api/limud/table -H 'content-type: application/json' -d "$C" | head -c 1800; echo
-          echo "PAGE $(curl -s https://limud.hania360.com/ | grep -c 't-par')"
+          for h in haktava kufsa; do echo "APP $h $(curl -s -o /dev/null -w '%{http_code}' https://$h.hania360.com/) $(curl -s https://$h.hania360.com/ | grep -o '<title>[^<]*' | head -1)"; done
+          echo "APP plan $(curl -s -X POST https://haktava.hania360.com/api/haktava/plan -H 'content-type: application/json' -d '{"text":"היום למדנו את האות ש עם חיריק. מילים: שיר, שיש"}')"
