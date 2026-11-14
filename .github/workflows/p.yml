@@ -5,6 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo LIVE $(curl -s https://hania360.com/api/live | head -c 600)
-          echo HOME $(curl -s https://hania360.com/ | grep -o 'm26-w\|id="live"\|n26-more' | sort | uniq -c | tr '\n' ' ')
-          echo CLASSIC $(curl -s https://hania360.com/classic | grep -c 'id="toolTabs"')
+          H=https://hania360-home.lior-hania.workers.dev
+          D=probeprobeprobe12345
+          echo PAGE $(curl -s "$H/?app=daber" | grep -o 'HaniaDaber' | head -1)
+          echo T1 $(curl -s -X POST "$H/api/daber/talk?app=daber" -H 'content-type: application/json' -d "{\"device\":\"$D\",\"sc\":\"cafe\",\"level\":1,\"hist\":[]}")
+          echo T2 $(curl -s -X POST "$H/api/daber/talk?app=daber" -H 'content-type: application/json' -d "{\"device\":\"$D\",\"sc\":\"cafe\",\"level\":1,\"hist\":[{\"me\":0,\"t\":\"Hi! What can I get for you today?\"},{\"me\":1,\"t\":\"I want coffee big and one croissant\"}]}")
+          echo HINT $(curl -s -X POST "$H/api/daber/talk?app=daber" -H 'content-type: application/json' -d "{\"device\":\"$D\",\"sc\":\"hotel\",\"level\":2,\"mode\":\"hint\",\"hist\":[{\"me\":0,\"t\":\"Good evening! Do you have a reservation with us?\"}]}")
+          curl -s -o v.mp3 -w "SAY %{http_code} %{content_type} %{size_download}\n" -X POST "$H/api/daber/say?app=daber" -H 'content-type: application/json' -d "{\"device\":\"$D\",\"text\":\"I would like a large latte and a croissant, please.\",\"voice\":\"apollo\"}"
+          A=$(base64 -w0 v.mp3); printf '{"device":"%s","audio":"%s"}' $D "$A" > h.json
+          echo HEAR $(curl -s -X POST "$H/api/daber/hear?app=daber" -H 'content-type: application/json' --data @h.json)
+          echo END $(curl -s -X POST "$H/api/daber/talk?app=daber" -H 'content-type: application/json' -d "{\"device\":\"$D\",\"sc\":\"cafe\",\"level\":1,\"mode\":\"end\",\"hist\":[{\"me\":0,\"t\":\"Hi! What can I get for you?\"},{\"me\":1,\"t\":\"I want coffee big\"},{\"me\":0,\"t\":\"Sure, anything else?\"},{\"me\":1,\"t\":\"No thanks, how much it cost?\"}]}")
