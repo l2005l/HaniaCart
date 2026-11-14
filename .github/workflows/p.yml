@@ -5,9 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          H=https://daber.hania360.com
-          echo PAGE $(curl -s -o /dev/null -w "%{http_code}" $H/) $(curl -s $H/ | grep -o 'HaniaDaber' | head -1)
-          echo ICON $(curl -s -o /dev/null -w "%{http_code} %{content_type}" $H/icons/icon-192.png)
-          echo MAN $(curl -s -o /dev/null -w "%{http_code}" $H/manifest.webmanifest)
-          echo T1 $(curl -s -X POST "$H/api/daber/talk" -H 'content-type: application/json' -d '{"device":"probeprobeprobe12345","sc":"airport","level":2,"hist":[]}' | head -c 300)
-          echo SAY $(curl -s -o /dev/null -w "%{http_code} %{content_type}" -X POST "$H/api/daber/say" -H 'content-type: application/json' -d '{"device":"probeprobeprobe12345","text":"Hello there!"}')
+          H="https://hania360-home.lior-hania.workers.dev"
+          echo PAGE $(curl -s -o /dev/null -w "%{http_code}" "$H/?app=fit") $(curl -s "$H/?app=fit" | grep -o 'HaniaFit\|FIT_EX' | sort -u | tr '\n' ' ')
+          echo HEB $(curl -s -o /dev/null -w "%{http_code}" "$H/hebcal.js?app=fit")
+          echo KEY $(curl -s "$H/api/shabbat/key?app=fit" | head -c 60)
+          echo DOM $(curl -s -o /dev/null -w "%{http_code}" https://fit.hania360.com/)
