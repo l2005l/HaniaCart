@@ -1,10 +1,10 @@
-name: probe
+name: p
 on: push
 jobs:
   p:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "BOI $(curl -s -m 20 'https://boi.org.il/PublicApi/GetExchangeRates?asJson=true' | head -c 700)"
-          echo "YNET $(curl -s -m 20 -A 'Mozilla/5.0' 'https://www.ynet.co.il/Integration/StoryRss1854.xml' | head -c 1200)"
-          echo "SPORT $(curl -s -m 20 'https://hania360.com/api/sport/il' | head -c 700)"
+          echo LIVE $(curl -s https://hania360.com/api/live | head -c 600)
+          echo HOME $(curl -s https://hania360.com/ | grep -o 'm26-w\|id="live"\|n26-more' | sort | uniq -c | tr '\n' ' ')
+          echo CLASSIC $(curl -s https://hania360.com/classic | grep -c 'id="toolTabs"')
