@@ -4,6 +4,9 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { ref: probe-now }
-      - run: node t/p.mjs
+      - shell: bash {0}
+        run: |
+          echo "R tv $(curl -s -o /dev/null -w '%{http_code}' https://tv.hania360.com/)"
+          echo "R wd $(curl -s 'https://hania360-home.l2005l.workers.dev/?app=tv' | grep -o '<title>[^<]*' | head -1)"
+          echo "R sh $(curl -s 'https://hania360.com/api/widget' | grep -o '"shab":{[^}]*}')"
+          echo "R home $(curl -s https://hania360.com/ | grep -c 'tv.hania360.com')"
