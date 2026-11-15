@@ -6,6 +6,4 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          for u in / /manifest.webmanifest /sw.js /icons/icon-192.png /hebcal.js /install.js; do echo "R $u $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://tv.hania360.com$u)"; done
-          echo "R title $(curl -s https://tv.hania360.com/ | grep -o '<title>[^<]*')"
-          echo "R emb $(curl -s -A 'Mozilla/5.0 Chrome/124' -H 'Referer: https://tv.hania360.com/' -o /dev/null -w '%{http_code}' 'https://www.youtube-nocookie.com/embed/live_stream?channel=UCknLrEdhRCp1aegoMqRaCZg')"
+          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UCisowXt5wZkp2sR3rFh9lnQ,UC7fWeaHhqgM4Ry-RMpM2YYw,UCLA_DiR1FfKNvjuUpBHmylQ,UCZH1ZFHSLSZEh_Ek2L-vrgA,UCSJ4gkVC6NrvII8umztf0Ow')"
