@@ -5,5 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo W1 $(curl -s "https://hania360.com/api/widget?c=0")
-          echo AL $(curl -s https://fit.hania360.com/.well-known/assetlinks.json)
+          echo AL $(curl -s https://hania360.com/.well-known/assetlinks.json | head -c 300)
+          echo APP $(curl -sL -o a.apk -w "%{http_code} %{size_download}" https://hania360.com/app) $(file a.apk | cut -c1-60)
