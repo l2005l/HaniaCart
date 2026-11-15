@@ -6,4 +6,4 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UCisowXt5wZkp2sR3rFh9lnQ,UC7fWeaHhqgM4Ry-RMpM2YYw,UCLA_DiR1FfKNvjuUpBHmylQ,UCZH1ZFHSLSZEh_Ek2L-vrgA,UCSJ4gkVC6NrvII8umztf0Ow')"
+          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UC7fWeaHhqgM4Ry-RMpM2YYw&x=2')"
