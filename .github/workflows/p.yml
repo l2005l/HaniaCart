@@ -5,5 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo AL $(curl -s https://hania360.com/.well-known/assetlinks.json | head -c 300)
-          echo APP $(curl -sL -o a.apk -w "%{http_code} %{size_download}" https://hania360.com/app) $(file a.apk | cut -c1-60)
+          H="https://hania360-home.lior-hania.workers.dev"
+          echo PAGE $(curl -s -o /dev/null -w "%{http_code}" "$H/?app=race") $(curl -s "$H/?app=race" | grep -o 'HaniaRace' | head -1)
+          for f in three.min.js GLTFLoader.js "models/race.glb" "models/Textures/colormap.png" icons/icon-192.png; do echo F $f $(curl -s -o /dev/null -w "%{http_code} %{size_download}" "https://race.hania360.com/$f?app=race"); done
+          echo DOM $(curl -s -o /dev/null -w "%{http_code}" https://race.hania360.com/)
