@@ -4,16 +4,17 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - run: |
+      - shell: bash {0}
+        run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
-          for h in i24NEWS_HE i24NEWS_EN DWNews France24_en aljazeeraenglish SkyNews euronews NASA TRTWorld ABCNews NBCNews CBSNews knesset KnessetTV knesset_channel TheKnessetChannel kanchinuchit HopChannel galatz glz kan88 LofiGirl exploreorg explore_org AnimalPlanetLiveCams jerusalemcam WesternWallLive kotel kotelcams; do
+          for h in i24NEWS_HE i24NEWS_EN i24NEWSFR DWNews France24_en aljazeeraenglish SkyNews euronews NASA TRTWorld ABCNews NBCNews CBSNews LiveNOW knesset KnessetTV TheKnessetChannel kanchinuchit HopChannel galatz glz LofiGirl exploreorg explore_org NASASpaceflight SpaceVideosHD earthcam Bloomberg BloombergTV CNN GBNews; do
             p=$(curl -sL -A "$UA" -H "Accept-Language: en" -b "CONSENT=YES+1; SOCS=CAI" "https://www.youtube.com/@$h/live")
             cid=$(echo "$p" | grep -o '"channelId":"UC[^"]*"' | head -1 | cut -d'"' -f4)
             ext=$(echo "$p" | grep -o '"externalId":"UC[^"]*"' | head -1 | cut -d'"' -f4)
             vid=$(echo "$p" | grep -o '"videoId":"[^"]*"' | head -1 | cut -d'"' -f4)
             live=$(echo "$p" | grep -c '"isLive":true')
             emb=$(echo "$p" | grep -o '"playableInEmbed":[a-z]*' | head -1)
-            t=$(echo "$p" | grep -o '"author":"[^"]*"' | head -1)
+            t=$(echo "$p" | grep -o '"ownerChannelName":"[^"]*"' | head -1)
+            [ -z "$t" ] && t=$(echo "$p" | grep -o '<title>[^<]*' | head -1)
             echo "R $h | ch=$cid ext=$ext | live=$live | $vid | $emb | $t"
           done
-          for u in https://www.kan.org.il/live/ https://www.mako.co.il/mako-vod-live-tv/VOD-6540b8dcb64fd31006.htm https://13tv.co.il/live/ https://www.now14.co.il/live/ https://www.i24news.tv/he/live https://main.knesset.gov.il/news/broadcast/pages/live.aspx https://www.kan.org.il/live/radio-player/?stationId=4483 https://glz.co.il/ https://www.kankids.org.il/ https://www.hop.co.il/ ; do echo "U $u $(curl -s -o /dev/null -L -A "$UA" -w '%{http_code} %{url_effective}' "$u")"; done
