@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          H="https://hania360-home.lior-hania.workers.dev"
-          echo PAGE $(curl -s -o /dev/null -w "%{http_code}" "$H/?app=race") $(curl -s "$H/?app=race" | grep -o 'HaniaRace' | head -1)
-          for f in three.min.js GLTFLoader.js "models/race.glb" "models/Textures/colormap.png" icons/icon-192.png; do echo F $f $(curl -s -o /dev/null -w "%{http_code} %{size_download}" "https://race.hania360.com/$f?app=race"); done
-          echo DOM $(curl -s -o /dev/null -w "%{http_code}" https://race.hania360.com/)
+          H=https://race.hania360.com
+          echo PAGE $(curl -s -o /dev/null -w "%{http_code}" $H/) $(curl -s $H/ | grep -o 'HaniaRace\|game.js?v=[a-f0-9]*' | sort -u | tr '\n' ' ')
+          V=$(curl -s $H/ | grep -o 'game.js?v=[a-f0-9]*' | head -1)
+          for f in "$V" three.min.js?v=r128 GLTFLoader.js?v=r128 "models/race.glb?v=1" "models/firetruck.glb?v=1" models/Textures/colormap.png icons/icon-192.png sw.js manifest.webmanifest; do echo F $f $(curl -sL -o /dev/null -w "%{http_code} %{size_download} %{content_type}" "$H/$f"); done
