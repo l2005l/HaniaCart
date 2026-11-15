@@ -6,4 +6,5 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UC7fWeaHhqgM4Ry-RMpM2YYw&x=2')"
+          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UC7fWeaHhqgM4Ry-RMpM2YYw&x=3')"
+          echo "R2 $(curl -s 'https://tv.hania360.com/api/tv/live?ids=UCisowXt5wZkp2sR3rFh9lnQ,UCvHDpsWKADrDia0c99X37vg,UCknLrEdhRCp1aegoMqRaCZg,UCQfwfsi5VrQ8yKZ-UWmAEFg,UCoMdktPbSTixAyNGwb-UYkQ,UCSrZ3UV4jOidv8ppoVuvW9Q,UCBi2mrWuNuyYy4gbM6fU18Q,UCeY0bbntWzzVIaj2z3QigXg,UC8p1vwvWtl6T73JiExfWs1g,UCb8m18O6r3QZV0RhHSqM_hg,UC7fWeaHhqgM4Ry-RMpM2YYw,UCNye-wNBqNL5ZzHSJj3l8Bg,UCLA_DiR1FfKNvjuUpBHmylQ,UCakgsb0w7QB0VHdnCc-OVEA,UCSUu1lih2RifWkKtDOJdsBA,UC6qrG3W8SMK0jior2olka3g,UCSJ4gkVC6NrvII8umztf0Ow,UCZH1ZFHSLSZEh_Ek2L-vrgA,UCKqFqiCe1dCUxRe0_YNZ6gg,UC_HwfTAcjBESKZRJq6BTCpg,UC8vRsz-RmoBznazlIULyqhQ,UCI2UmoF6sGS4jpc0UOOpiZA,UCpjNXONNE-JUz7QACB1Cgcw,UCmitIAFjxiF12oa0iktC2Wg,UClZXqxeY540_Epab3WDHFGw,UCTS-cdSY4MM8EpHL5vPC9jQ,UCupvZG-5ko_eiXAupbDfxWw')"
