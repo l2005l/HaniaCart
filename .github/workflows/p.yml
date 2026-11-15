@@ -5,6 +5,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo C $(curl -s https://hania360.com/widget/connect | grep -o "<h1>[^<]*")
-          echo W $(curl -s "https://hania360.com/api/widget?c=0&t=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN" | grep -o '"me":[^}]*}')
-          echo D $(curl -s "https://hania360.com/api/widget?c=0" | grep -o '"heb":"[^"]*"')
+          for h in kann kan11 KAN11NEWS kannews N12News newsil channel13news reshet13 now14il channel14 i24NEWS_HE i24NEWS i24NEWSEnglish KnessetChannel knessetil kanEducational makan33 DWNews France24_en FRANCE24English aljazeeraenglish SkyNews euronews NASA BloombergTelevision TRTWorld CNA ABCNews NBCNews CBSNews exploreorg; do
+            p=$(curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36" -H "Accept-Language: en" -b "CONSENT=YES+1; SOCS=CAI" "https://www.youtube.com/@$h/live")
+            cid=$(echo "$p" | grep -o '"externalId":"UC[^"]*"' | head -1)
+            tt=$(echo "$p" | grep -o '<title>[^<]*' | head -1 | cut -c8-60)
+            live=$(echo "$p" | grep -o '"isLiveNow":true\|"isLive":true' | head -1)
+            vid=$(echo "$p" | grep -o '<link rel="canonical" href="https://www.youtube.com/watch?v=[^"]*' | head -1 | sed 's/.*v=//')
+            echo "R $h | $cid | $tt | $live | $vid"
+          done
