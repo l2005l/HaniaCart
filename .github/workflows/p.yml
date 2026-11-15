@@ -5,7 +5,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          H=https://race.hania360.com
-          echo PAGE $(curl -s -o /dev/null -w "%{http_code}" $H/) $(curl -s $H/ | grep -o 'HaniaRace\|game.js?v=[a-f0-9]*' | sort -u | tr '\n' ' ')
-          V=$(curl -s $H/ | grep -o 'game.js?v=[a-f0-9]*' | head -1)
-          for f in "$V" three.min.js?v=r128 GLTFLoader.js?v=r128 "models/race.glb?v=1" "models/firetruck.glb?v=1" models/Textures/colormap.png icons/icon-192.png sw.js manifest.webmanifest; do echo F $f $(curl -sL -o /dev/null -w "%{http_code} %{size_download} %{content_type}" "$H/$f"); done
+          sleep 600
+          echo W $(curl -s "https://hania360.com/api/widget?c=0" | head -c 200)
