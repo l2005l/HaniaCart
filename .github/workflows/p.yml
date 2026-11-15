@@ -4,6 +4,11 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { ref: probe-now }
-      - run: node t/p.mjs
+      - shell: bash {0}
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124 Safari/537.36"
+          for u in https://www.kan.org.il/live/ https://www.kan.org.il/live/?stationId=4444 https://www.mako.co.il/mako-vod-live-tv/VOD-6540b8dcb64fd31006.htm https://www.mako.co.il/mako-vod-live-tv https://13tv.co.il/live/ https://www.now14.co.il/live/ https://www.c14.co.il/live/ https://www.i24news.tv/he/live https://www.i24news.tv/he https://www.knesset.tv/ https://main.knesset.gov.il/news/broadcast/pages/live.aspx https://www.kankids.org.il/ https://www.kan.org.il/content/kids/ https://www.hop.co.il/ https://glz.co.il/ https://glz.co.il/%D7%92%D7%9C%D7%92%D7%9C%D7%A6 https://103fm.maariv.co.il/ https://www.kan.org.il/radio/ https://www.kan.org.il/radio/kan-bet/ https://www.kan.org.il/radio/kan-gimel/ https://www.kan.org.il/radio/kan-88/ https://www.kan.org.il/radio/kan-tarbut/ https://www.kan.org.il/radio/kan-moreshet/ https://www.kan.org.il/radio/kan-kol-hamusica/ https://www.kan.org.il/radio/kan-reka/ https://www.kan.org.il/radio/kan-makan/ https://www.kolchai.fm/ https://www.kol-chai.co.il/ https://www.kolbarama.co.il/ https://www.radio1.co.il/ https://www.ecocast.co.il/ https://english.thekotel.org/kotel-camera/ https://thekotel.org/he/kotel-camera/ https://english.thekotel.org/ https://www.ynet.co.il/ https://www.kan.org.il/live/tv.aspx?stationid=2 https://explore.org/livecams https://www.mako.co.il/news-live ; do echo "U $u $(curl -s -o /dev/null -L -A "$UA" --max-time 20 -w '%{http_code} %{url_effective}' "$u")"; done
+          for c in UCZH1ZFHSLSZEh_Ek2L-vrgA UCpjNXONNE-JUz7QACB1Cgcw UCisowXt5wZkp2sR3rFh9lnQ UCLA_DiR1FfKNvjuUpBHmylQ UC8vRsz-RmoBznazlIULyqhQ; do
+            h=$(curl -sL -A "$UA" "https://www.youtube.com/embed/live_stream?channel=$c")
+            echo "E $c $(echo "$h" | grep -o '"videoId":"[^"]*"' | head -1) $(echo "$h" | grep -o '"isLive[A-Za-z]*":[a-z]*' | head -2 | tr '\n' ' ') $(echo "$h"| grep -o 'errorScreen\|UNPLAYABLE\|LIVE_STREAM_OFFLINE' | head -1) len=${#h}"
+          done
