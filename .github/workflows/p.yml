@@ -6,5 +6,15 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UC7fWeaHhqgM4Ry-RMpM2YYw&x=3')"
-          echo "R2 $(curl -s 'https://tv.hania360.com/api/tv/live?ids=UCisowXt5wZkp2sR3rFh9lnQ,UCvHDpsWKADrDia0c99X37vg,UCknLrEdhRCp1aegoMqRaCZg,UCQfwfsi5VrQ8yKZ-UWmAEFg,UCoMdktPbSTixAyNGwb-UYkQ,UCSrZ3UV4jOidv8ppoVuvW9Q,UCBi2mrWuNuyYy4gbM6fU18Q,UCeY0bbntWzzVIaj2z3QigXg,UC8p1vwvWtl6T73JiExfWs1g,UCb8m18O6r3QZV0RhHSqM_hg,UC7fWeaHhqgM4Ry-RMpM2YYw,UCNye-wNBqNL5ZzHSJj3l8Bg,UCLA_DiR1FfKNvjuUpBHmylQ,UCakgsb0w7QB0VHdnCc-OVEA,UCSUu1lih2RifWkKtDOJdsBA,UC6qrG3W8SMK0jior2olka3g,UCSJ4gkVC6NrvII8umztf0Ow,UCZH1ZFHSLSZEh_Ek2L-vrgA,UCKqFqiCe1dCUxRe0_YNZ6gg,UC_HwfTAcjBESKZRJq6BTCpg,UC8vRsz-RmoBznazlIULyqhQ,UCI2UmoF6sGS4jpc0UOOpiZA,UCpjNXONNE-JUz7QACB1Cgcw,UCmitIAFjxiF12oa0iktC2Wg,UClZXqxeY540_Epab3WDHFGw,UCTS-cdSY4MM8EpHL5vPC9jQ,UCupvZG-5ko_eiXAupbDfxWw')"
+          echo "R1 $(curl -s 'https://tv.hania360.com/api/tv/live?debug=1&ids=UCknLrEdhRCp1aegoMqRaCZg,UC7fWeaHhqgM4Ry-RMpM2YYw&x=4' | cut -c1-600)"
+          echo "R2 $(curl -s 'https://tv.hania360.com/api/tv/live?ids=UCisowXt5wZkp2sR3rFh9lnQ,UCvHDpsWKADrDia0c99X37vg,UCknLrEdhRCp1aegoMqRaCZg,UCQfwfsi5VrQ8yKZ-UWmAEFg,UCoMdktPbSTixAyNGwb-UYkQ,UCSrZ3UV4jOidv8ppoVuvW9Q,UCBi2mrWuNuyYy4gbM6fU18Q,UCeY0bbntWzzVIaj2z3QigXg,UC8p1vwvWtl6T73JiExfWs1g,UCb8m18O6r3QZV0RhHSqM_hg,UC7fWeaHhqgM4Ry-RMpM2YYw,UCNye-wNBqNL5ZzHSJj3l8Bg,UCLA_DiR1FfKNvjuUpBHmylQ,UCakgsb0w7QB0VHdnCc-OVEA,UCSUu1lih2RifWkKtDOJdsBA,UC6qrG3W8SMK0jior2olka3g,UCSJ4gkVC6NrvII8umztf0Ow,UCZH1ZFHSLSZEh_Ek2L-vrgA,UCKqFqiCe1dCUxRe0_YNZ6gg,UC_HwfTAcjBESKZRJq6BTCpg,UC8vRsz-RmoBznazlIULyqhQ,UCI2UmoF6sGS4jpc0UOOpiZA,UCpjNXONNE-JUz7QACB1Cgcw,UCmitIAFjxiF12oa0iktC2Wg')"
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
+          for h in Olympics redbull RedBullMotorsports DAZNFootball DAZNBoxing FIFA FIFAPlus NBA NFL WWE UFC FormulaE WorldAthletics UCI_cycling WSL ATPTour WTA MotoGP Eurosport sport5 sport5israel ONEsportil one_co_il WinnerLeague ligathaal IsraelFootballAssociation EuroLeague basketballcl FIBA FIBA3x3 Bundesliga LaLiga premierleague SerieA ChampionsLeague UEFA TheAFCLeague RedBullTV SailGP RugbyWorldCup ITTFWorld BWFTV volleyballworld chesscom FIDE_chess; do
+            p=$(curl -sL -A "$UA" -H "Accept-Language: en" -b "CONSENT=YES+1; SOCS=CAI" "https://www.youtube.com/@$h/live")
+            ext=$(echo "$p" | grep -o '"externalId":"UC[^"]*"' | head -1 | cut -d'"' -f4)
+            ch=$(echo "$p" | grep -o '"channelId":"UC[^"]*"' | head -1 | cut -d'"' -f4)
+            live=$(echo "$p" | grep -c '"isLive":true')
+            t=$(echo "$p" | grep -o '<title>[^<]*' | head -1 | cut -c8-60)
+            ti=$(echo "$p" | grep -o '"playerOverlayVideoDetailsRenderer":{"title":{"simpleText":"[^"]*' | head -1 | cut -c60-120)
+            echo "S $h | $ext $ch | live=$live | $t | $ti"
+          done
