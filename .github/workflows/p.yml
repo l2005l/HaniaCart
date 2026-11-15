@@ -5,11 +5,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for h in kann kan11 KAN11NEWS kannews N12News newsil channel13news reshet13 now14il channel14 i24NEWS_HE i24NEWS i24NEWSEnglish KnessetChannel knessetil kanEducational makan33 DWNews France24_en FRANCE24English aljazeeraenglish SkyNews euronews NASA BloombergTelevision TRTWorld CNA ABCNews NBCNews CBSNews exploreorg; do
-            p=$(curl -sL -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36" -H "Accept-Language: en" -b "CONSENT=YES+1; SOCS=CAI" "https://www.youtube.com/@$h/live")
-            cid=$(echo "$p" | grep -o '"externalId":"UC[^"]*"' | head -1)
-            tt=$(echo "$p" | grep -o '<title>[^<]*' | head -1 | cut -c8-60)
-            live=$(echo "$p" | grep -o '"isLiveNow":true\|"isLive":true' | head -1)
-            vid=$(echo "$p" | grep -o '<link rel="canonical" href="https://www.youtube.com/watch?v=[^"]*' | head -1 | sed 's/.*v=//')
-            echo "R $h | $cid | $tt | $live | $vid"
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
+          for h in i24NEWS_HE i24NEWS_EN DWNews France24_en aljazeeraenglish SkyNews euronews NASA TRTWorld ABCNews NBCNews CBSNews knesset KnessetTV knesset_channel TheKnessetChannel kanchinuchit HopChannel galatz glz kan88 LofiGirl exploreorg explore_org AnimalPlanetLiveCams jerusalemcam WesternWallLive kotel kotelcams; do
+            p=$(curl -sL -A "$UA" -H "Accept-Language: en" -b "CONSENT=YES+1; SOCS=CAI" "https://www.youtube.com/@$h/live")
+            cid=$(echo "$p" | grep -o '"channelId":"UC[^"]*"' | head -1 | cut -d'"' -f4)
+            ext=$(echo "$p" | grep -o '"externalId":"UC[^"]*"' | head -1 | cut -d'"' -f4)
+            vid=$(echo "$p" | grep -o '"videoId":"[^"]*"' | head -1 | cut -d'"' -f4)
+            live=$(echo "$p" | grep -c '"isLive":true')
+            emb=$(echo "$p" | grep -o '"playableInEmbed":[a-z]*' | head -1)
+            t=$(echo "$p" | grep -o '"author":"[^"]*"' | head -1)
+            echo "R $h | ch=$cid ext=$ext | live=$live | $vid | $emb | $t"
           done
+          for u in https://www.kan.org.il/live/ https://www.mako.co.il/mako-vod-live-tv/VOD-6540b8dcb64fd31006.htm https://13tv.co.il/live/ https://www.now14.co.il/live/ https://www.i24news.tv/he/live https://main.knesset.gov.il/news/broadcast/pages/live.aspx https://www.kan.org.il/live/radio-player/?stationId=4483 https://glz.co.il/ https://www.kankids.org.il/ https://www.hop.co.il/ ; do echo "U $u $(curl -s -o /dev/null -L -A "$UA" -w '%{http_code} %{url_effective}' "$u")"; done
