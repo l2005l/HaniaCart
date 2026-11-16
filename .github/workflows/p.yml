@@ -6,5 +6,7 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          curl -s https://tv.hania360.com/ | grep -o 'עכשיו בשידור' | head -1 | sed 's/^/R /'
-          for u in https://www.kan.org.il/live/ https://www.mako.co.il/mako-vod-live-tv/VOD-6540b8dcb64fd31006.htm https://13tv.co.il/live/ https://www.now14.co.il/live/ https://www.knesset.tv/; do echo "X $u $(curl -sI -L -A 'Mozilla/5.0 Chrome/124' $u | grep -i 'x-frame-options\|frame-ancestors' | tr -d '\r' | tr '\n' ' ' | cut -c1-150)"; done
+          echo "R / $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://ai.hania360.com/)"
+          echo "R manifest $(curl -s -o /dev/null -w '%{http_code}' https://ai.hania360.com/manifest.webmanifest)"
+          echo "R icon $(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://ai.hania360.com/icons/icon-192.png)"
+          echo "R api $(curl -s -o /dev/null -w '%{http_code}' -X POST https://ai.hania360.com/api/ai/chat)"
