@@ -6,7 +6,5 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R / $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://ai.hania360.com/)"
-          echo "R manifest $(curl -s -o /dev/null -w '%{http_code}' https://ai.hania360.com/manifest.webmanifest)"
-          echo "R icon $(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://ai.hania360.com/icons/icon-192.png)"
-          echo "R api $(curl -s -o /dev/null -w '%{http_code}' -X POST https://ai.hania360.com/api/ai/chat)"
+          for u in https://gtfs.mot.gov.il/gtfsfiles/israel-public-transportation.zip https://gtfs.mot.gov.il/gtfsfiles/ https://www.rail.co.il/ https://rail.co.il/ https://israelrail.azurefd.net/rjpa-prod/api/v1/timetable/searchTrainLuzForDateTime; do echo "R $u $(curl -s -o /dev/null -I -L --max-time 30 -w '%{http_code} %{size_download} %{content_type}' $u)"; done
+          curl -sI --max-time 30 https://gtfs.mot.gov.il/gtfsfiles/israel-public-transportation.zip | grep -i "content-length\|last-modified" | sed 's/^/R /'
