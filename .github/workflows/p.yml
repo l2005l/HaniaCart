@@ -4,4 +4,4 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "R $(curl -s https://hania360.com/api/gtfs-probe)"
+      - run: sleep 200; echo "R $(curl -s 'https://hania360.com/api/widget?c=0' | grep -o '"shab":{[^}]*}')"
