@@ -4,4 +4,9 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - run: sleep 200; echo "R $(curl -s 'https://hania360.com/api/widget?c=0' | grep -o '"shab":{[^}]*}')"
+      - shell: bash {0}
+        run: |
+          echo "R inject $(curl -s https://matalot.hania360.com/ | grep -c '__hs_meta') kasefet $(curl -s https://kasefet.hania360.com/ | grep -c '__hs_meta')"
+          echo "R sync $(curl -s -o /dev/null -w '%{http_code}' https://matalot.hania360.com/api/sync)"
+          echo "R rem $(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/reminders) mine $(curl -s -o /dev/null -w '%{http_code}' -X POST https://hania360.com/api/shabbat/mine)"
+          echo "R sport $(curl -s -o /dev/null -w '%{http_code}' https://sport.hania360.com/)"
