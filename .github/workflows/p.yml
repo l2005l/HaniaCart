@@ -6,11 +6,8 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          H=$(curl -s https://hania360.com/)
-          echo "R home bytes=$(echo "$H" | wc -c) dial=$(echo "$H" | grep -c 'id="dial"') ld=$(echo "$H" | grep -o 'application/ld+json' | wc -l) title=$(echo "$H" | grep -o '<title>[^<]*' | head -1)"
-          echo "R og $(echo "$H" | grep -o 'og:image" content="[^"]*' | head -2 | tr '\n' ' ')"
-          echo "R llms $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://hania360.com/llms.txt)"
-          echo "R signin-cross $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://evil.com' -H 'content-type: application/json' --data '{"email":"a@b.co"}' https://hania360.com/api/home/signin)"
-          echo "R signin-bad $(curl -s -X POST -H 'origin: https://hania360.com' -H 'content-type: application/json' --data '{"email":"nope"}' https://hania360.com/api/home/signin)"
-          echo "R classic $(curl -s https://hania360.com/classic | grep -c 'id="dial"') about=$(curl -s https://hania360.com/about | grep -c 'מסביב לשעון')"
-          echo "R ogimg $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://hania360.com/og/home.jpg)"
+          H=$(curl -s https://race.hania360.com/)
+          echo "R race game=$(echo "$H" | grep -o 'game.js?v=[a-f0-9]*') expect=game.js?v=89034a7d73 credit=$(echo "$H" | grep -c 'Terrain Tiles')"
+          G=$(curl -s "https://race.hania360.com/game.js?v=89034a7d73")
+          echo "R game bytes=$(echo "$G" | wc -c) shops=$(echo "$G" | grep -c 'SHOP_T') cityv=$(echo "$G" | grep -o 'CITY_V = "[a-f0-9]*"')"
+          for c in haifa jerusalem tel-aviv netivot; do J=$(curl -s "https://race.hania360.com/city/$c.json?v=b46bbd8b94"); echo "R city $c bytes=$(echo "$J" | wc -c) elev=$(echo "$J" | grep -c '"elev"')"; done
