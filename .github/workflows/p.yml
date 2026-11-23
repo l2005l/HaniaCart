@@ -2,19 +2,22 @@ name: p
 on: push
 permissions:
   contents: write
-  actions: read
 jobs:
-  collect:
+  maps:
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          path: got
-          run-id: 45268548075
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - shell: bash
+      - shell: bash {0}
         run: |
-          mkdir -p city && cp got/*/*.json city/ && ls -la city | sed 's/^/R /'
+          pip install -q osmium 2>&1 | tail -1
+          curl -sL -o il.pbf https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf; ls -la il.pbf | sed 's/^/R /'
+          python3 pbf2city.py il.pbf cities.txt raw 2>&1 | sed 's/^R /R /'
+          mkdir -p city
+          while IFS='|' read -r id he la lo; do
+            [ -f raw/$id.center ] || continue
+            read cla clo < raw/$id.center
+            python3 osm2city.py raw/$id.json city/$id.json "$he" $cla $clo 900
+          done < cities.txt
           git config user.name probe && git config user.email probe@users.noreply.github.com
-          git checkout --orphan osm-out && git rm -rq --cached . && git add city && git commit -qm "city maps (© OpenStreetMap contributors, ODbL)" && git push -f origin osm-out
+          git checkout -q --orphan osm-out && git rm -rq --cached . && git add city && git commit -qm "city maps (© OpenStreetMap contributors, ODbL)" && git push -qf origin osm-out && echo "R pushed"
