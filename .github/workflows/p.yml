@@ -3,33 +3,34 @@ on: push
 jobs:
   p:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        city: ["tel-aviv|תל אביב-יפו|32.0700|34.7740", "jerusalem|ירושלים|31.7815|35.2165", "haifa|חיפה||", "rishon|ראשון לציון||", "petah-tikva|פתח תקווה||", "ashdod|אשדוד||", "netanya|נתניה||", "beer-sheva|באר שבע||", "holon|חולון||", "bnei-brak|בני ברק||", "ramat-gan|רמת גן||", "rehovot|רחובות||", "ashkelon|אשקלון||", "bat-yam|בת ים||", "beit-shemesh|בית שמש||", "kfar-saba|כפר סבא||", "herzliya|הרצליה||", "hadera|חדרה||", "modiin|מודיעין-מכבים-רעות||", "netivot|נתיבות||"]
     steps:
       - uses: actions/checkout@v4
       - shell: bash {0}
         run: |
           mkdir -p out raw
-          S="https://overpass.kumi.systems/api/interpreter https://overpass-api.de/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter"
-          ask() { # ask <query> <file>: try the servers until one gives JSON
-            for t in 1 2 3; do for u in $S; do
-              curl -s -m 180 -A "HaniaRace city map (hania360.com)" --data-urlencode "data=$1" "$u" -o "$2.tmp"
-              if python3 -c "import json,sys;d=json.load(open(sys.argv[1]));assert 'elements' in d" "$2.tmp" 2>/dev/null; then mv "$2.tmp" "$2"; return 0; fi
-              sleep 5
-            done; sleep 20; done; return 1; }
-          while IFS='|' read -r id he la lo; do
-            [ -z "$id" ] && continue
-            if [ -z "$la" ]; then
-              ask "[out:json][timeout:60];node[\"place\"~\"^(city|town)$\"][\"name\"=\"$he\"](29.4,34.2,33.4,35.95);out 1;" raw/$id-c.json || { echo "R fail-center $id"; continue; }
-              read la lo < <(python3 -c "import json,sys;e=json.load(open(sys.argv[1]))['elements'][0];print(e['lat'],e['lon'])" raw/$id-c.json) || { echo "R no-center $id"; continue; }
-            fi
-            B=$(python3 -c "import math,sys;la,lo=float(sys.argv[1]),float(sys.argv[2]);r=1050;a=r/110540;b=r/(111320*math.cos(math.radians(la)));print('%.5f,%.5f,%.5f,%.5f'%(la-a,lo-b,la+a,lo+b))" $la $lo)
-            BW=$(python3 -c "import math,sys;la,lo=float(sys.argv[1]),float(sys.argv[2]);r=3000;a=r/110540;b=r/(111320*math.cos(math.radians(la)));print('%.5f,%.5f,%.5f,%.5f'%(la-a,lo-b,la+a,lo+b))" $la $lo)
-            Q="[out:json][timeout:170];(way[\"highway\"]($B);way[\"building\"]($B);way[\"leisure\"]($B);way[\"landuse\"]($B);way[\"natural\"]($BW);way[\"amenity\"=\"parking\"]($B);way[\"place\"=\"square\"]($B););out body geom;node[\"highway\"~\"^(traffic_signals|stop|give_way|crossing|bus_stop|street_lamp)$\"]($B);out;node[\"natural\"=\"tree\"]($B);out;node[\"amenity\"~\"^(hospital|fire_station|fuel|cafe|restaurant|fast_food|pharmacy|school|kindergarten|post_office|bank)$\"]($B);out;node[\"shop\"]($B);out;"
-            if ask "$Q" raw/$id.json; then python3 osm2city.py raw/$id.json out/$id.json "$he" $la $lo 900; else echo "R fail $id"; fi
-            sleep 8
-          done < cities.txt
-          ls -la out | sed 's/^/R /'
+          S="https://overpass-api.de/api/interpreter https://maps.mail.ru/osm/tools/overpass/api/interpreter https://overpass.kumi.systems/api/interpreter https://overpass.private.coffee/api/interpreter"
+          ask() { for t in 1 2 3 4; do for u in $S; do
+              curl -s -m 200 -A "HaniaRace city map (hania360.com)" --data-urlencode "data=$1" "$u" -o "$2.tmp"
+              if python3 -c "import json,sys;d=json.load(open(sys.argv[1]));assert 'elements' in d and (len(d['elements'])>0 or sys.argv[2]=='c')" "$2.tmp" "$3" 2>/dev/null; then mv "$2.tmp" "$2"; echo "R ok $u"; return 0; fi
+              echo "R miss $u $(head -c 120 $2.tmp | tr '\n' ' ')"; sleep 8
+            done; sleep 30; done; return 1; }
+          IFS='|' read -r id he la lo <<< "${{ matrix.city }}"
+          if [ -z "$la" ]; then
+            ask "[out:json][timeout:60];node[\"place\"~\"^(city|town)$\"][\"name\"=\"$he\"](29.4,34.2,33.4,35.95);out 1;" raw/$id-c.json c || exit 1
+            read la lo < <(python3 -c "import json,sys;e=json.load(open(sys.argv[1]))['elements'][0];print(e['lat'],e['lon'])" raw/$id-c.json)
+          fi
+          B=$(python3 -c "import math,sys;la,lo=float(sys.argv[1]),float(sys.argv[2]);r=1050;a=r/110540;b=r/(111320*math.cos(math.radians(la)));print('%.5f,%.5f,%.5f,%.5f'%(la-a,lo-b,la+a,lo+b))" $la $lo)
+          BW=$(python3 -c "import math,sys;la,lo=float(sys.argv[1]),float(sys.argv[2]);r=3000;a=r/110540;b=r/(111320*math.cos(math.radians(la)));print('%.5f,%.5f,%.5f,%.5f'%(la-a,lo-b,la+a,lo+b))" $la $lo)
+          Q="[out:json][timeout:190];(way[\"highway\"]($B);way[\"building\"]($B);way[\"leisure\"]($B);way[\"landuse\"]($B);way[\"natural\"]($BW);way[\"amenity\"=\"parking\"]($B);way[\"place\"=\"square\"]($B););out body geom;node[\"highway\"~\"^(traffic_signals|stop|give_way|crossing|bus_stop|street_lamp)$\"]($B);out;node[\"natural\"=\"tree\"]($B);out;node[\"amenity\"~\"^(hospital|fire_station|fuel|cafe|restaurant|fast_food|pharmacy|school|kindergarten|post_office|bank)$\"]($B);out;node[\"shop\"]($B);out;"
+          ask "$Q" raw/$id.json x || exit 1
+          python3 osm2city.py raw/$id.json out/$id.json "$he" $la $lo 900
       - uses: actions/upload-artifact@v4
         with:
-          name: cities
+          name: city-${{ strategy.job-index }}
           path: out/
