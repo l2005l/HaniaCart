@@ -39,6 +39,15 @@ class Cut(osmium.SimpleHandler):
             if inb(c['b'], la, lo): c['el'].append({'type': 'node', 'id': n.id, 'lat': la, 'lon': lo, 'tags': dict(t)})
     def way(self, w):
         t = w.tags
+        # shops and places drawn as an outline: their middle, as a point
+        if 'shop' in t or t.get('amenity') in NODE_AM:
+            try:
+                ps = [(nd.location.lat, nd.location.lon) for nd in w.nodes]
+                if ps:
+                    la, lo = sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps)
+                    for c in live:
+                        if inb(c['b'], la, lo): c['el'].append({'type': 'node', 'id': -w.id, 'lat': la, 'lon': lo, 'tags': dict(t)})
+            except osmium.InvalidLocationError: pass
         wide = 'natural' in t
         if not ('highway' in t or 'building' in t or 'leisure' in t or 'landuse' in t or wide or t.get('amenity') == 'parking' or t.get('place') == 'square'): return
         try: pts = [(nd.location.lat, nd.location.lon, nd.ref) for nd in w.nodes]

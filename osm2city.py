@@ -79,7 +79,12 @@ for e in d['elements']:
         coast.append([c for p in pts for c in p])
 nodes = {k: [] for k in ('sig', 'stop', 'give', 'cross', 'bus', 'lamp', 'tree')}
 poi = []
-PK = {'hospital': 'h', 'fire_station': 'f', 'fuel': 'u', 'cafe': 'c', 'restaurant': 'c', 'fast_food': 'c', 'pharmacy': 'm', 'school': 'k', 'kindergarten': 'k', 'post_office': 'o', 'bank': 'b'}
+# places: [kind, name, x, z, chain]. The name only for independent places and public ones: a chain (a "brand" in
+# OpenStreetMap) gets no name, and the game shows what it is ("סופרמרקט", "תחנת דלק") instead.
+PK = {'hospital': 'h', 'fire_station': 'f', 'fuel': 'u', 'cafe': 'c', 'restaurant': 'r', 'fast_food': 'ff', 'pharmacy': 'm', 'school': 'k', 'kindergarten': 'g', 'post_office': 'o', 'bank': 'b'}
+SK = {'supermarket': 'S', 'convenience': 'M', 'bakery': 'B', 'greengrocer': 'V', 'butcher': 'U', 'kiosk': 'K', 'clothes': 'C', 'shoes': 'C', 'hairdresser': 'H', 'beauty': 'H', 'florist': 'F', 'books': 'L', 'toys': 'T', 'electronics': 'E', 'mobile_phone': 'E', 'optician': 'O', 'jewelry': 'J', 'hardware': 'W', 'doityourself': 'W', 'furniture': 'N', 'pet': 'P', 'alcohol': 'A', 'wine': 'A', 'deli': 'D', 'confectionery': 'B', 'pastry': 'B', 'chemist': 'm', 'stationery': 'L', 'gift': 'T', 'variety_store': 'M', 'laundry': 'Y', 'dry_cleaning': 'Y', 'tailor': 'Y', 'bicycle': 'Q', 'car_repair': 'R', 'car': 'R', 'tobacco': 'K', 'ice_cream': 'I', 'seafood': 'U', 'cosmetics': 'H', 'perfumery': 'H', 'bag': 'C', 'sports': 'Q', 'music': 'L', 'photo': 'E', 'computer': 'E'}
+def chain(t): return any(k in t for k in ('brand', 'brand:wikidata', 'brand:he', 'brand:en'))
+def nm_of(t): return (t.get('name:he') or t.get('name') or '').strip()[:28]
 for e in d['elements']:
     if e['type'] != 'node': continue
     t = e.get('tags', {}); p = P(e['lat'], e['lon'])
@@ -90,11 +95,11 @@ for e in d['elements']:
     if k and (k != 'tree' or len(nodes['tree']) < 9000): nodes[k].extend(p)
     am = t.get('amenity')
     if am in PK:
-        # names only for public places (hospital, fire station, school); shops and cafés stay unnamed
-        nm = (t.get('name:he') or t.get('name') or '') if PK[am] in ('h', 'f', 'k') else ''
-        poi.append([PK[am], N(nm), p[0], p[1]])
+        ch = chain(t)
+        poi.append([PK[am], -1 if ch else N(nm_of(t)), p[0], p[1], 1 if ch else 0])
     elif 'shop' in t and len(poi) < 4000:
-        poi.append(['s', -1, p[0], p[1]])
+        ch = chain(t)
+        poi.append([SK.get(t.get('shop'), 's'), -1 if ch else N(nm_of(t)), p[0], p[1], 1 if ch else 0])
 o = {'v': 1, 'name': name, 'lat0': lat0, 'lon0': lon0, 'r': R, 'credit': '© OpenStreetMap contributors (ODbL)', 'names': names, 'verts': verts, 'roads': roads,
      'walks': walks, 'bld': bld, 'areas': areas, 'coast': coast, 'nodes': nodes, 'poi': poi}
 s = json.dumps(o, ensure_ascii=False, separators=(',', ':'))

@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - shell: bash {0}
         run: |
-          pip install -q osmium 2>&1 | tail -1
+          pip install -q osmium pillow 2>&1 | tail -1
           curl -sL -o il.pbf https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf; ls -la il.pbf | sed 's/^/R /'
           python3 pbf2city.py il.pbf cities.txt raw 2>&1 | sed 's/^R /R /'
           mkdir -p city
@@ -19,5 +19,6 @@ jobs:
             read cla clo < raw/$id.center
             python3 osm2city.py raw/$id.json city/$id.json "$he" $cla $clo 900
           done < cities.txt
+          python3 elev.py city/*.json 2>&1 | sed 's/^R /R /'
           git config user.name probe && git config user.email probe@users.noreply.github.com
           git checkout -q --orphan osm-out && git rm -rq --cached . && git add city && git commit -qm "city maps (© OpenStreetMap contributors, ODbL)" && git push -qf origin osm-out && echo "R pushed"
