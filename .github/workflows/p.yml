@@ -6,8 +6,9 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R me=$(curl -s https://hania360.com/ | grep -c 'id="me"') classic=$(curl -s https://hania360.com/classic | grep -c 'y26')"
-          echo "R anon $(curl -s https://hania360.com/api/home | head -c 600)"
-          C='h360_i=%7B%22a%22%3A%5B%22shigra%22%2C%22tv%22%2C%22sky%22%5D%2C%22c%22%3A%5B%22%D7%97%D7%99%D7%A4%D7%94%22%2C32.794%2C34.99%2C30%5D%7D'
-          echo "R apps $(curl -s -H "Cookie: $C" https://hania360.com/api/home | head -c 700)"
-          echo "R bad $(curl -s -o /dev/null -w '%{http_code}' -H 'Cookie: hp_session=nope' https://hania360.com/api/home)"
+          echo "R home $(curl -s 'https://hania360.com/api/home?c=0' | head -c 260)"
+          echo "R task-cross $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://evil.com' -H 'content-type: application/json' --data '{"op":"add","text":"x"}' https://hania360.com/api/home/task)"
+          echo "R task-anon $(curl -s -X POST -H 'origin: https://hania360.com' -H 'content-type: application/json' --data '{"op":"add","text":"x"}' https://hania360.com/api/home/task)"
+          echo "R dat prep=$(curl -s https://dat.hania360.com/ | grep -c 'id=\"prep\"') matalot hebcal=$(curl -s https://matalot.hania360.com/ | grep -c 'hebcal.js') lite=$(curl -s https://matalot.hania360.com/ | grep -c 'window.HB = { Location')"
+          echo "R matalot KB $(curl -s https://matalot.hania360.com/ | wc -c) shigra quick=$(curl -s https://shigra.hania360.com/ | grep -c 'quickStart')"
+          echo "R widget $(curl -s 'https://hania360.com/api/widget?c=0' | head -c 200)"
