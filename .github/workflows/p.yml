@@ -6,6 +6,5 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          for h in frame party globe eretz sky shana layla; do echo "R $h $(curl -s https://$h.hania360.com/ | grep -o '<title>[^<]*' | head -1)"; done
-          echo "R globejs $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://globe.hania360.com/globe.js)"
-          echo "R qr $(curl -s -o /dev/null -w '%{http_code}' https://party.hania360.com/qrcode.js) $(curl -s -o /dev/null -w '%{http_code}' https://frame.hania360.com/qrcode.js)"
+          for h in layla.hania360.com shigra.hania360.com hania360.com; do echo "R $h fonts=$(curl -s https://$h/ | grep -c "media=\"print\" onload") err=$(curl -s https://$h/ | grep -c 's("err",m)')"; done
+          echo "R stat $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'user-agent: Mozilla/5.0 (Linux; Android 14) Chrome/130' --data '{"e":"err","m":"probe: ignore @1:1"}' https://layla.hania360.com/api/stat)"
