@@ -6,10 +6,7 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          for h in layla shamayim; do echo "R $h $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://$h.hania360.com/)"; done
-          echo "R skyjs $(curl -s -o /dev/null -w '%{http_code} %{size_download}' "https://shamayim.hania360.com/sky.js")"
-          echo "R tle $(curl -s -w ' [%{http_code}]' https://shamayim.hania360.com/api/sky/tle | tr '\n' '|' | cut -c1-200)"
-          echo "R tle2 $(curl -s -o /dev/null -w '%{http_code}' https://shamayim.hania360.com/api/sky/tle)"
-          for f in manifest.webmanifest sw.js install.js hebcal.js icons/icon-192.png icons/icon-512.png icons/apple-180.png; do echo "R layla/$f $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://layla.hania360.com/$f)"; done
-          for f in manifest.webmanifest sw.js icons/icon-192.png; do echo "R sky/$f $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://shamayim.hania360.com/$f)"; done
-          echo "R laylasync $(curl -s -o /dev/null -w '%{http_code}' https://layla.hania360.com/api/sync)"
+          echo "R old-sky $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://shamayim.hania360.com/)"
+          echo "R old-shana $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://hania360.com/shana)"
+          for h in sky shana; do echo "R $h $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://$h.hania360.com/)"; done
+          echo "R tle $(curl -s -o /dev/null -w '%{http_code}' https://sky.hania360.com/api/sky/tle) year $(curl -s -o /dev/null -w '%{http_code}' https://shana.hania360.com/api/year)"
