@@ -6,5 +6,8 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          for h in layla.hania360.com shigra.hania360.com hania360.com; do echo "R $h fonts=$(curl -s https://$h/ | grep -c "media=\"print\" onload") err=$(curl -s https://$h/ | grep -c 's("err",m)')"; done
-          echo "R stat $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'user-agent: Mozilla/5.0 (Linux; Android 14) Chrome/130' --data '{"e":"err","m":"probe: ignore @1:1"}' https://layla.hania360.com/api/stat)"
+          echo "R me=$(curl -s https://hania360.com/ | grep -c 'id="me"') classic=$(curl -s https://hania360.com/classic | grep -c 'y26')"
+          echo "R anon $(curl -s https://hania360.com/api/home | head -c 600)"
+          C='h360_i=%7B%22a%22%3A%5B%22shigra%22%2C%22tv%22%2C%22sky%22%5D%2C%22c%22%3A%5B%22%D7%97%D7%99%D7%A4%D7%94%22%2C32.794%2C34.99%2C30%5D%7D'
+          echo "R apps $(curl -s -H "Cookie: $C" https://hania360.com/api/home | head -c 700)"
+          echo "R bad $(curl -s -o /dev/null -w '%{http_code}' -H 'Cookie: hp_session=nope' https://hania360.com/api/home)"
