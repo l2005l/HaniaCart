@@ -6,7 +6,6 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R old-sky $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://shamayim.hania360.com/)"
-          echo "R old-shana $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://hania360.com/shana)"
-          for h in sky shana; do echo "R $h $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://$h.hania360.com/)"; done
-          echo "R tle $(curl -s -o /dev/null -w '%{http_code}' https://sky.hania360.com/api/sky/tle) year $(curl -s -o /dev/null -w '%{http_code}' https://shana.hania360.com/api/year)"
+          for h in sky shana frame party globe eretz; do echo "R $h $(curl -s -o /dev/null -w '%{http_code}' https://$h.hania360.com/)"; done
+          echo "R framenew $(curl -s -X POST -H 'content-type: application/json' -d '{"name":"probe"}' https://frame.hania360.com/api/frame/new | cut -c1-30)"
+          echo "R partynew $(curl -s -X POST https://party.hania360.com/api/party/new | cut -c1-20)"
