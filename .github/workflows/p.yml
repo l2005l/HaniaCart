@@ -6,7 +6,7 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R inject $(curl -s https://matalot.hania360.com/ | grep -c '__hs_meta') kasefet $(curl -s https://kasefet.hania360.com/ | grep -c '__hs_meta')"
-          echo "R sync $(curl -s -o /dev/null -w '%{http_code}' https://matalot.hania360.com/api/sync)"
-          echo "R rem $(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/reminders) mine $(curl -s -o /dev/null -w '%{http_code}' -X POST https://hania360.com/api/shabbat/mine)"
-          echo "R sport $(curl -s -o /dev/null -w '%{http_code}' https://sport.hania360.com/)"
+          echo "R sky $(curl -s -o /dev/null -w '%{http_code}' https://shamayim.hania360.com/)"
+          echo "R tle $(curl -s https://shamayim.hania360.com/api/sky/tle | head -3)"
+          echo "R celestrak $(curl -s 'https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE' | head -2)"
+          echo "R skyjs $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://shamayim.hania360.com/sky.js)"
