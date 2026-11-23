@@ -6,9 +6,6 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R home $(curl -s 'https://hania360.com/api/home?c=0' | head -c 260)"
-          echo "R task-cross $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'origin: https://evil.com' -H 'content-type: application/json' --data '{"op":"add","text":"x"}' https://hania360.com/api/home/task)"
-          echo "R task-anon $(curl -s -X POST -H 'origin: https://hania360.com' -H 'content-type: application/json' --data '{"op":"add","text":"x"}' https://hania360.com/api/home/task)"
-          echo "R dat prep=$(curl -s https://dat.hania360.com/ | grep -c 'id=\"prep\"') matalot hebcal=$(curl -s https://matalot.hania360.com/ | grep -c 'hebcal.js') lite=$(curl -s https://matalot.hania360.com/ | grep -c 'window.HB = { Location')"
-          echo "R matalot KB $(curl -s https://matalot.hania360.com/ | wc -c) shigra quick=$(curl -s https://shigra.hania360.com/ | grep -c 'quickStart')"
-          echo "R widget $(curl -s 'https://hania360.com/api/widget?c=0' | head -c 200)"
+          echo "R hazmana thanks=$(curl -s https://hazmana.hania360.com/ | grep -c 'תודה שבאתם')"
+          echo "R ai $(curl -s -o /dev/null -w '%{http_code}' https://ai.hania360.com/) chat-anon $(curl -s -X POST -H 'content-type: application/json' --data '{"messages":[{"role":"user","content":"מה יש לי היום?"}]}' https://ai.hania360.com/api/ai/chat | head -c 120)"
+          echo "R home task-ck=$(curl -s https://hania360.com/ | grep -c 'y26-ck')"
