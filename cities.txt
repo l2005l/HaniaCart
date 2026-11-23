@@ -3,15 +3,15 @@ jerusalem|ירושלים|31.7815|35.2165
 haifa|חיפה||
 rishon|ראשון לציון||
 petah-tikva|פתח תקווה||
-ashdod|אשדוד||
+ashdod|אשדוד|31.7985|34.6420
 netanya|נתניה||
 beer-sheva|באר שבע||
 holon|חולון||
 bnei-brak|בני ברק||
 ramat-gan|רמת גן||
 rehovot|רחובות||
-ashkelon|אשקלון||
-bat-yam|בת ים||
+ashkelon|אשקלון|31.6700|34.5545
+bat-yam|בת ים|32.0170|34.7440
 beit-shemesh|בית שמש||
 kfar-saba|כפר סבא||
 herzliya|הרצליה||
