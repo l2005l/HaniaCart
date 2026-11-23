@@ -1,0 +1,20 @@
+tel-aviv|תל אביב-יפו|32.0700|34.7740
+jerusalem|ירושלים|31.7815|35.2165
+haifa|חיפה||
+rishon|ראשון לציון||
+petah-tikva|פתח תקווה||
+ashdod|אשדוד||
+netanya|נתניה||
+beer-sheva|באר שבע||
+holon|חולון||
+bnei-brak|בני ברק||
+ramat-gan|רמת גן||
+rehovot|רחובות||
+ashkelon|אשקלון||
+bat-yam|בת ים||
+beit-shemesh|בית שמש||
+kfar-saba|כפר סבא||
+herzliya|הרצליה||
+hadera|חדרה||
+modiin|מודיעין-מכבים-רעות||
+netivot|נתיבות||
