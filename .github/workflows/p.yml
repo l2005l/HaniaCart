@@ -6,6 +6,6 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          for h in sky shana frame party globe eretz; do echo "R $h $(curl -s -o /dev/null -w '%{http_code}' https://$h.hania360.com/)"; done
-          echo "R framenew $(curl -s -X POST -H 'content-type: application/json' -d '{"name":"probe"}' https://frame.hania360.com/api/frame/new | cut -c1-30)"
-          echo "R partynew $(curl -s -X POST https://party.hania360.com/api/party/new | cut -c1-20)"
+          for h in frame party globe eretz sky shana layla; do echo "R $h $(curl -s https://$h.hania360.com/ | grep -o '<title>[^<]*' | head -1)"; done
+          echo "R globejs $(curl -s -o /dev/null -w '%{http_code} %{size_download}' https://globe.hania360.com/globe.js)"
+          echo "R qr $(curl -s -o /dev/null -w '%{http_code}' https://party.hania360.com/qrcode.js) $(curl -s -o /dev/null -w '%{http_code}' https://frame.hania360.com/qrcode.js)"
