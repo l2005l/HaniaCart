@@ -7,4 +7,4 @@ jobs:
       - shell: bash {0}
         run: |
           H=$(curl -s https://hania360.com/)
-          echo "R fix=$(echo "$H" | grep -c 'a.v3-game,.v3 a.v3-btn') desc=$(echo "$H" | grep -c 'עליות וירידות, חנויות')"
+          echo "R side=$(echo "$H" | grep -c 'v3-handw')"
