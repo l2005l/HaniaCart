@@ -6,8 +6,5 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          H=$(curl -s https://race.hania360.com/)
-          echo "R race game=$(echo "$H" | grep -o 'game.js?v=[a-f0-9]*') expect=game.js?v=89034a7d73 credit=$(echo "$H" | grep -c 'Terrain Tiles')"
-          G=$(curl -s "https://race.hania360.com/game.js?v=89034a7d73")
-          echo "R game bytes=$(echo "$G" | wc -c) shops=$(echo "$G" | grep -c 'SHOP_T') cityv=$(echo "$G" | grep -o 'CITY_V = "[a-f0-9]*"')"
-          for c in haifa jerusalem tel-aviv netivot; do J=$(curl -s "https://race.hania360.com/city/$c.json?v=b46bbd8b94"); echo "R city $c bytes=$(echo "$J" | wc -c) elev=$(echo "$J" | grep -c '"elev"')"; done
+          H=$(curl -s https://hania360.com/)
+          echo "R fix=$(echo "$H" | grep -c 'a.v3-game,.v3 a.v3-btn') desc=$(echo "$H" | grep -c 'עליות וירידות, חנויות')"
