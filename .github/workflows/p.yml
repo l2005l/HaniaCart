@@ -6,5 +6,10 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          H=$(curl -s https://hania360.com/)
-          echo "R side=$(echo "$H" | grep -c 'v3-handw')"
+          echo "R page=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/feedback?app=race)"
+          echo "R admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://hania360.com/feedback/admin)"
+          echo "R list=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/api/feedback/list)"
+          echo "R post=$(curl -s -H 'origin: https://hania360.com' -H 'content-type: application/json' -d '{"kind":"other","app":"general","page":"/","text":"בדיקה אוטומטית אחרי ההעלאה. אפשר למחוק","ms":5000,"dev":"probe"}' https://hania360.com/api/feedback)"
+          echo "R badorigin=$(curl -s -H 'origin: https://evil.example' -H 'content-type: application/json' -d '{"kind":"bug","text":"xxx","ms":5000}' https://hania360.com/api/feedback)"
+          echo "R shigra-link=$(curl -s https://shigra.hania360.com/ | grep -c 'h360-fb')"
+          echo "R home-link=$(curl -s https://hania360.com/ | grep -c 'href="/feedback"')"
