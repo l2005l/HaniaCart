@@ -6,10 +6,7 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R page=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/feedback?app=race)"
-          echo "R admin=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' https://hania360.com/feedback/admin)"
-          echo "R list=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/api/feedback/list)"
-          echo "R post=$(curl -s -H 'origin: https://hania360.com' -H 'content-type: application/json' -d '{"kind":"other","app":"general","page":"/","text":"בדיקה אוטומטית אחרי ההעלאה. אפשר למחוק","ms":5000,"dev":"probe"}' https://hania360.com/api/feedback)"
-          echo "R badorigin=$(curl -s -H 'origin: https://evil.example' -H 'content-type: application/json' -d '{"kind":"bug","text":"xxx","ms":5000}' https://hania360.com/api/feedback)"
-          echo "R shigra-link=$(curl -s https://shigra.hania360.com/ | grep -c 'h360-fb')"
-          echo "R home-link=$(curl -s https://hania360.com/ | grep -c 'href="/feedback"')"
+          echo "R page=$(curl -s -o /tmp/p -w '%{http_code}' https://loz.hania360.com/) title=$(grep -o '<title>[^<]*' /tmp/p) og=$(grep -c 'og:image' /tmp/p) ga=$(grep -c 'googletagmanager' /tmp/p)"
+          echo "R c=$(curl -s -o /dev/null -w '%{http_code}' https://loz.hania360.com/c)"
+          echo "R ics=$(curl -s https://loz.hania360.com/c.ics?e=eyJkIjoiMjAyNi0xMS0yNiIsInMiOiIwOTowMCIsImUiOiIxMDowMCIsInQiOiLXkdeT15nXp9eUIn0 | grep -E 'DTSTART|SUMMARY' | tr '\r\n' '  ')"
+          echo "R icon=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://loz.hania360.com/icons/icon-192.png) og=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/og/loz.jpg)"
