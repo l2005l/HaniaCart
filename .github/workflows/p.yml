@@ -4,7 +4,8 @@ jobs:
   p:
     runs-on: ubuntu-latest
     steps:
-      - shell: bash {0}
-        run: |
-          echo "R page=$(curl -s -o /tmp/p -w '%{http_code}' https://smart.hania360.com/) title=$(grep -o '<title>[^<]*' /tmp/p) app=$(grep -c 'hania_boiler_shabbat\|boiler_shabbat' /tmp/p) ga=$(grep -c googletagmanager /tmp/p)"
-          echo "R icon=$(curl -s -o /dev/null -w '%{http_code}' https://smart.hania360.com/icons/icon-192.png) sw=$(curl -s -o /dev/null -w '%{http_code}' https://smart.hania360.com/sw.js) og=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/og/smart.jpg)"
+      - run: |
+          for u in https://smart.hania360.com/ https://smart.hania360.com/mini https://shigra.hania360.com/hsmart https://hania360.com/; do
+            c=$(curl -s -D /tmp/h -o /tmp/b -w "%{http_code}" "$u?v=$RANDOM"); echo "Z R $u $c $(grep -i '^content-security-policy' /tmp/h | tr -d '\r')"
+            echo "Z R  away:$(grep -c 'לא בבית בשבת הזאת' /tmp/b) mini:$(grep -c 'hsmart' /tmp/b) chan:$(grep -c 'firstCandles' /tmp/b) shigra:$(grep -c 'hania-shigra' /tmp/b)"
+          done
