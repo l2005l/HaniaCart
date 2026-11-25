@@ -6,7 +6,4 @@ jobs:
     steps:
       - shell: bash {0}
         run: |
-          echo "R page=$(curl -s -o /tmp/p -w '%{http_code}' https://loz.hania360.com/) title=$(grep -o '<title>[^<]*' /tmp/p) og=$(grep -c 'og:image' /tmp/p) ga=$(grep -c 'googletagmanager' /tmp/p)"
-          echo "R c=$(curl -s -o /dev/null -w '%{http_code}' https://loz.hania360.com/c)"
-          echo "R ics=$(curl -s https://loz.hania360.com/c.ics?e=eyJkIjoiMjAyNi0xMS0yNiIsInMiOiIwOTowMCIsImUiOiIxMDowMCIsInQiOiLXkdeT15nXp9eUIn0 | grep -E 'DTSTART|SUMMARY' | tr '\r\n' '  ')"
-          echo "R icon=$(curl -s -o /dev/null -w '%{http_code} %{content_type}' https://loz.hania360.com/icons/icon-192.png) og=$(curl -s -o /dev/null -w '%{http_code}' https://hania360.com/og/loz.jpg)"
+          echo "R fix=$(curl -s https://loz.hania360.com/ | grep -c 'intent://send')"
