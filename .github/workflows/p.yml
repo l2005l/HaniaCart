@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for u in https://smart.hania360.com/ https://smart.hania360.com/mini https://shigra.hania360.com/hsmart https://hania360.com/; do
+          for u in https://smart.hania360.com/; do
             c=$(curl -s -D /tmp/h -o /tmp/b -w "%{http_code}" "$u?v=$RANDOM"); echo "Z R $u $c $(grep -i '^content-security-policy' /tmp/h | tr -d '\r')"
-            echo "Z R  away:$(grep -c 'לא בבית בשבת הזאת' /tmp/b) mini:$(grep -c 'hsmart' /tmp/b) chan:$(grep -c 'firstCandles' /tmp/b) shigra:$(grep -c 'hania-shigra' /tmp/b)"
+            echo "Z R  hot:$(grep -c "מכמה מעלות זה יום חם" /tmp/b) fc:$(grep -c "get_forecasts" /tmp/b)"
           done
